@@ -38,7 +38,28 @@ helm upgrade promtail grafana/promtail \
   --values observability/helm/promtail-values.yaml
 ```
 
-### 4. Generar tráfico de prueba
+### 4. Fix del CronJob: labels en el pod template
+
+Los manifests del CronJob y Job en `TP1/HIT7/k8s/` y `TP1/HIT8/k8s/` no incluian labels en el `podTemplate`. Sin `app: scraper`, el `keep` del relabel config filtraba todos los pods generados por el CronJob y los logs nunca llegaban a Loki.
+
+Se agregó `metadata.labels.app: scraper` al `template` de `cronjob.yaml` y `job.yaml`:
+
+```yaml
+template:
+  metadata:
+    labels:
+      app: scraper
+  spec:
+    ...
+```
+
+Luego se re-deployó el CronJob:
+
+```bash
+kubectl -n ml-scraper replace --force -f TP1/HIT7/k8s/cronjob.yaml
+```
+
+### 5. Generar tráfico de prueba
 
 ```bash
 kubectl -n ml-scraper create job --from=cronjob/scraper-hourly scraper-test-1
