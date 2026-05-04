@@ -2,8 +2,38 @@ config:
   clients:
     - url: http://loki.observability.svc.cluster.local:3100/loki/api/v1/push
 
-  # Por defecto Promtail trae un scrape config para todos los pods del cluster
-  # con relabeling estándar. En el Hit #2 lo refinamos.
+  snippets:
+    extraScrapeConfigs: |
+      - job_name: ml-scraper-pods
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [ml-scraper]
+        relabel_configs:
+          # Drop pods que no son del scraper (ej: postgres del Hit #8)
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: scraper
+            action: keep
+          # Map labels Kubernetes a labels Loki
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            target_label: container
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: app
+          - source_labels: [__meta_kubernetes_pod_label_job_name]
+            target_label: job_name
+          - source_labels: [__meta_kubernetes_node_name]
+            target_label: node
+          # Path al log file en el host
+          - source_labels:
+              - __meta_kubernetes_pod_uid
+              - __meta_kubernetes_pod_container_name
+            target_label: __path__
+            separator: /
+            replacement: /var/log/pods/*$1/*.log
 
 resources:
   requests: { cpu: 50m, memory: 64Mi }

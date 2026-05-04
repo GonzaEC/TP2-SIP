@@ -8,6 +8,9 @@ metadata:
 spec:
   backoffLimit: 2
   template:
+    metadata:
+      labels:
+        app: scraper
     spec:
       restartPolicy: OnFailure
       initContainers:
