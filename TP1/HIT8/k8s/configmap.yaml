@@ -1,0 +1,19 @@
+---
+# configmap.yaml
+# Configuración del scraper HIT8: browser, headless, productos y conexión a PostgreSQL.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scraper-config
+data:
+  BROWSER: "chrome"
+  HEADLESS: "true"
+  LOG_LEVEL: "INFO"
+  PRODUCTS: |
+    bicicleta rodado 29
+    iPhone 16 Pro Max
+    GeForce RTX 5090
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "scraper"
+  POSTGRES_USER: "scraper"

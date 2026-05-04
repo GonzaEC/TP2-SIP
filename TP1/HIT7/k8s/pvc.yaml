@@ -1,0 +1,15 @@
+# k8s/pvc.yaml
+# Volumen persistente de 1 GB para guardar JSONs y screenshots.
+# Usa local-path (storage class que trae k3s out-of-the-box).
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scraper-output
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi

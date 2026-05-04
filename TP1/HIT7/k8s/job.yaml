@@ -1,0 +1,31 @@
+# k8s/job.yaml
+# Job one-off: corre el scraper una sola vez contra los 3 productos.
+# Lee la configuración desde el ConfigMap y escribe los outputs en el PVC.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scraper-once
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: scraper
+          image: ghcr.io/gonzaec/ml-scraper:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: scraper-config
+          volumeMounts:
+            - name: output
+              mountPath: /app/output
+              subPath: output
+            - name: output
+              mountPath: /app/screenshots
+              subPath: screenshots
+      volumes:
+        - name: output
+          persistentVolumeClaim:
+            claimName: scraper-output

@@ -1,0 +1,65 @@
+# Pre-commit hooks para TP1-SIP (HIT6 en adelante).
+#
+# Activación local:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Ejecutar contra todos los archivos del repo (no solo los staged):
+#   pre-commit run --all-files
+#
+# Estos hooks bloquean el commit si:
+#   - Gitleaks detecta secrets hardcodeados
+#   - Spotless detecta código mal formateado (Java)
+#   - Checkstyle detecta violaciones de estilo (Java)
+
+repos:
+  # ── Secrets scanning ──────────────────────────────────────────────────────
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+        name: Gitleaks (secrets scan)
+
+  # ── Higiene general ────────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+
+  # ── Java: Spotless (formatter) + Checkstyle (linter) ──────────────────────
+  # Hooks locales que delegan en Maven. Solo corren cuando cambian .java en HIT6.
+  # Usamos `mvn -f HIT6/pom.xml` para que funcione sin bash (cross-platform: Windows/Linux/Mac).
+  - repo: local
+    hooks:
+      - id: spotless-apply
+        name: Spotless (Java formatter — google-java-format)
+        language: system
+        entry: mvn
+        args:
+          - --batch-mode
+          - -q
+          - -f
+          - HIT6/pom.xml
+          - spotless:apply
+        files: ^HIT6/.*\.java$
+        pass_filenames: false
+
+      - id: checkstyle
+        name: Checkstyle (Java linter — Sun coding conventions)
+        language: system
+        entry: mvn
+        args:
+          - --batch-mode
+          - -q
+          - -f
+          - HIT6/pom.xml
+          - checkstyle:check
+        files: ^HIT6/.*\.java$
+        pass_filenames: false

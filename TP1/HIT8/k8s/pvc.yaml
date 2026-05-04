@@ -1,0 +1,14 @@
+---
+# pvc.yaml
+# Volumen persistente para los JSONs y screenshots del scraper.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scraper-output
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi

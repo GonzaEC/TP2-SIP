@@ -1,0 +1,14 @@
+---
+# postgres-service.yaml
+# Service ClusterIP para que el Job/CronJob del scraper alcance PostgreSQL por nombre DNS.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP

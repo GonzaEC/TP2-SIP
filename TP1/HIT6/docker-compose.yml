@@ -1,0 +1,85 @@
+# docker-compose.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# Uso:
+#   docker compose up scraper                       # Chrome por defecto
+#   BROWSER=firefox docker compose up scraper       # Firefox
+#   HEADLESS=false docker compose up scraper        # Modo visible (debug)
+#   docker compose run --rm lint                    # Checkstyle + Spotless
+#   docker compose run --rm test                    # Tests unitarios + cobertura
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Servicio principal: corre el scraper ────────────────────────────────────
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: ml-scraper:latest
+    container_name: ml-scraper
+
+    environment:
+      BROWSER:    ${BROWSER:-chrome}
+      HEADLESS:   ${HEADLESS:-true}
+
+    volumes:
+      - ./output:/app/output
+      - ./screenshots:/app/screenshots
+
+    # Reinicio solo en fallo (no en exit 0)
+    restart: "no"
+
+  # ── Servicio de lint: Checkstyle + Spotless (no requiere instalación local) ─
+  lint:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder        # Reutiliza el stage de Maven (ya tiene las deps)
+    image: ml-scraper-builder:latest
+    container_name: ml-lint
+
+    # Sobreescribir el entrypoint para correr el goal de lint
+    entrypoint: ["mvn", "--batch-mode",
+                 "checkstyle:check",
+                 "spotless:check",
+                 "-q"]
+
+    volumes:
+      - ./src:/build/src:ro
+      - ./pom.xml:/build/pom.xml:ro
+      # Caché de Maven para no re-descargar en cada run
+      - maven-cache:/root/.m2
+
+    restart: "no"
+
+  # ── Servicio de tests: JUnit + JaCoCo ────────────────────────────────────────
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    image: ml-scraper-builder:latest
+    container_name: ml-test
+
+    entrypoint: ["mvn", "--batch-mode", "verify",
+                 "-Dheadless=true",
+                 "-DINTEGRATION=false"]
+
+    environment:
+      BROWSER:      ${BROWSER:-chrome}
+      HEADLESS:     "true"
+      INTEGRATION:  "false"
+
+    volumes:
+      - ./src:/build/src:ro
+      - ./pom.xml:/build/pom.xml:ro
+      - maven-cache:/root/.m2
+      # Exponer el reporte de cobertura al host
+      - ./target/site/jacoco:/build/target/site/jacoco
+
+    restart: "no"
+
+volumes:
+  maven-cache:
+    driver: local

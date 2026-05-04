@@ -1,0 +1,14 @@
+---
+# postgres-pvc.yaml
+# Volumen persistente para los datos de PostgreSQL.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi

@@ -1,0 +1,16 @@
+# k8s/configmap.yaml
+# Configuración externalizada del scraper.
+# El scraper lee BROWSER, HEADLESS y PRODUCTS desde variables de entorno.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scraper-config
+data:
+  BROWSER: "chrome"
+  HEADLESS: "true"
+  LOG_LEVEL: "INFO"
+  PRODUCTS: |
+    bicicleta rodado 29
+    iPhone 16 Pro Max
+    GeForce RTX 5090

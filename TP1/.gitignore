@@ -1,0 +1,97 @@
+# ── Secrets / entorno local (NUNCA subir al repo) ────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.yaml
+secrets.yml
+
+# ── Maven ─────────────────────────────────────────────────────────
+target/
+dependency-reduced-pom.xml
+.mvn/wrapper/maven-wrapper.jar
+
+# ── Salidas del scraper ───────────────────────────────────────────
+output/
+screenshots/
+
+# ── Java ──────────────────────────────────────────────────────────
+*.class
+*.jar
+!**/maven-wrapper.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*.log
+replay_pid*.log
+
+# ── IntelliJ IDEA ─────────────────────────────────────────────────
+.idea/
+.idea_modules/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ── Eclipse ───────────────────────────────────────────────────────
+.settings/
+.project
+.classpath
+.metadata/
+.factorypath
+.recommenders/
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+
+# ── VS Code ───────────────────────────────────────────────────────
+.vscode/
+*.code-workspace
+.history/
+
+# ── NetBeans ──────────────────────────────────────────────────────
+nbproject/private/
+build/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# ── Vim / Emacs ───────────────────────────────────────────────────
+*~
+*.swp
+*.swo
+.\#*
+\#*\#
+
+# ── macOS ─────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# ── Windows ───────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ── Linux ─────────────────────────────────────────────────────────
+.directory
+.Trash-*
+
+# ── Logs ──────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Pre-commit cache ──────────────────────────────────────────────
+.pre-commit-trash/
+
+# ── Python (por si alguien instala pre-commit en venv local) ─────
+.venv/
+venv/
+__pycache__/
+*.pyc

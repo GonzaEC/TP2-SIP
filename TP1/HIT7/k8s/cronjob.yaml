@@ -1,0 +1,36 @@
+# k8s/cronjob.yaml
+# CronJob programado: ejecuta el scraper cada hora (0 * * * *).
+# Mantiene histórico de ejecuciones exitosas (3) y fallidas (1).
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: scraper-hourly
+spec:
+  schedule: "0 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: scraper
+              image: ghcr.io/gonzaec/ml-scraper:latest
+              imagePullPolicy: Always
+              envFrom:
+                - configMapRef:
+                    name: scraper-config
+              volumeMounts:
+                - name: output
+                  mountPath: /app/output
+                  subPath: output
+                - name: output
+                  mountPath: /app/screenshots
+                  subPath: screenshots
+          volumes:
+            - name: output
+              persistentVolumeClaim:
+                claimName: scraper-output
