@@ -1,0 +1,48 @@
+# Single-binary mode — todo Loki en un solo pod, storage en filesystem local
+deploymentMode: SingleBinary
+
+singleBinary:
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 500m, memory: 512Mi }
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: local-path  # viene en k3s out-of-the-box
+
+loki:
+  auth_enabled: false  # acceso interno al cluster, no necesita multi-tenant
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+  schemaConfig:
+    configs:
+      - from: 2025-01-01
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  limits_config:
+    retention_period: 168h          # 7 días — alcanza para el TP
+    reject_old_samples: true
+    reject_old_samples_max_age: 168h
+    max_query_length: 721h          # 30 días
+  compactor:
+    retention_enabled: true
+    delete_request_store: filesystem
+
+# Apagar todo lo que no usamos en single-binary
+read:    { replicas: 0 }
+write:   { replicas: 0 }
+backend: { replicas: 0 }
+chunksCache:   { enabled: false }
+resultsCache:  { enabled: false }
+test: { enabled: false }
+monitoring:
+  selfMonitoring:    { enabled: false, grafanaAgent: { installOperator: false } }
+  lokiCanary:        { enabled: false }
+gateway: { enabled: false }   # accedemos directo al pod via Service

@@ -1,0 +1,15 @@
+config:
+  clients:
+    - url: http://loki.observability.svc.cluster.local:3100/loki/api/v1/push
+
+  # Por defecto Promtail trae un scrape config para todos los pods del cluster
+  # con relabeling estándar. En el Hit #2 lo refinamos.
+
+resources:
+  requests: { cpu: 50m, memory: 64Mi }
+  limits:   { cpu: 200m, memory: 128Mi }
+
+# Tolera taints del control plane porque en k3s single-node es el único nodo
+tolerations:
+  - effect: NoSchedule
+    operator: Exists

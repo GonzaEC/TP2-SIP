@@ -1,0 +1,50 @@
+admin:
+  existingSecret: grafana-admin   # creado por install.sh, NO en este YAML
+  userKey: admin-user
+  passwordKey: admin-password
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClassName: local-path
+
+resources:
+  requests: { cpu: 100m, memory: 128Mi }
+  limits:   { cpu: 300m, memory: 256Mi }
+
+service:
+  type: NodePort
+  nodePort: 30000
+
+# Datasource Loki provisionado — sin clicks en la UI
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.observability.svc.cluster.local:3100
+        isDefault: true
+        jsonData:
+          maxLines: 1000
+
+# Dashboard provisionado del Hit #5 — referencia el ConfigMap que se crea aparte
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: 'sip2026'
+        orgId: 1
+        folder: 'SIP 2026'
+        type: file
+        disableDeletion: false
+        options:
+          path: /var/lib/grafana/dashboards/sip2026
+
+# Montar el ConfigMap del dashboard (Hit #5)
+extraConfigmapMounts:
+  - name: scraper-overview-dashboard
+    configMap: scraper-overview-dashboard
+    mountPath: /var/lib/grafana/dashboards/sip2026
+    readOnly: true
