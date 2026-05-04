@@ -1,5 +1,7 @@
 package ar.edu.sip;
 
+import static net.logstash.logback.argument.StructuredArguments.kv;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -53,10 +55,11 @@ public class PostgresWriter {
       try (Connection conn = DriverManager.getConnection(url, user, password)) {
         insertarResultados(conn, producto, resultados);
         insertarStats(conn, producto, stats);
-        LOG.info("Guardados {} resultados para '{}'", resultados.size(), producto);
+        LOG.info("Guardados en BD", kv("producto", producto), kv("rows", resultados.size()));
       }
     } catch (SQLException e) {
-      LOG.error("Error al guardar en BD: {}", e.getMessage());
+      LOG.error(
+          "Error al guardar en BD", kv("producto", producto), kv("error_msg", e.getMessage()));
     }
   }
 

@@ -56,3 +56,32 @@ En el panel **Detected fields** deben aparecer: `level`, `producto`, `browser`, 
 ## Captura de validación
 
 ![HIT3 - JSON Fields](../../screenshots/hit3-json-fields.png)
+
+## QUE SE CAMBIO
+```bash
+TP1/HIT8/pom.xml
+TP1/HIT8/src/main/java/ar/edu/sip/MercadoLibreScraper.java
+TP1/HIT8/src/main/java/ar/edu/sip/PostgresWriter.java
+TP1/HIT8/src/main/resources/logback.xml
+```
+Se agrego logstash.encoder.version 7.4 al pom.xml
+logback.xml se modifico el CONSOLE para que cambe de encoder. El FILE queda igual (texto plano para debugging local). Solo el CONSOLE pasa de PatternLayout a LogstashEncoder, que es quien emite el JSON que Promtail va a leer.
+MercadoLibreScraper.java tiene 2 mecanismos nuevos:
+* MDC (org.slf4j.MDC) para campos que aplican a todo un bloque de logs:
+```
+MDC.put("browser", browser) → aparece en todos los logs de la ejecución
+MDC.put("producto", producto) → aparece en todos los logs de ese producto
+MDC.put("intento", ...) → aparece en logs del retry actual
+```
+* kv() (StructuredArguments.kv) para campos puntuales de un evento:
+```java
+javaLOG.info("Scrape completado", kv("items_found", resultados.size()), kv("duration_ms", duracionMs));
+LOG.warn("Filtro no aplicado", kv("filtro", texto), kv("error_msg", e.getMessage()));
+```
+El resultado en stdout es:
+```bash
+json{"timestamp":"2026-05-04T12:00:00Z","level":"INFO","logger":"ar.edu.sip.MercadoLibreScraper",
+ "message":"Scrape completado","browser":"chrome","producto":"iPhone 16 Pro Max",
+ "items_found":30,"duration_ms":4521}
+```
+En Loki esto queda disponible con: {namespace="ml-scraper"} | json | producto="iPhone 16 Pro Max".

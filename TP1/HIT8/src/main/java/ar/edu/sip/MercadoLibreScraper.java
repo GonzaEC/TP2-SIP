@@ -1,5 +1,7 @@
 package ar.edu.sip;
 
+import static net.logstash.logback.argument.StructuredArguments.kv;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.File;
@@ -8,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.openqa.selenium.*;
@@ -15,10 +18,21 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 /**
  * Scraper de MercadoLibre con paginación (hasta 3 páginas / 30 resultados) y persistencia en
  * PostgreSQL.
+ *
+ * <p>Hit #3: emite logs JSON line-delimited a stdout via LogstashEncoder. Campos estructurados
+ * disponibles en Loki con {@code | json | producto="iphone"} o {@code | json | level="ERROR"}.
+ *
+ * <p>Estrategia de campos:
+ *
+ * <ul>
+ *   <li>MDC.put() → campos que aplican a un bloque de líneas (producto, browser, intento).
+ *   <li>kv() como argumento → campos puntuales de un evento (items_found, duration_ms, page).
+ * </ul>
  */
 public class MercadoLibreScraper {
 
@@ -56,15 +70,21 @@ public class MercadoLibreScraper {
     WebDriver driver = BrowserFactory.create(browser, headless);
     WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TIMEOUT_SEG));
 
-    LOG.info("MercadoLibre Scraper — HIT 8");
+    // browser en MDC global: aparece en todos los logs de esta ejecución
+    MDC.put("browser", browser);
+    LOG.info("MercadoLibre Scraper iniciado");
 
     try {
       for (String producto : productos) {
-        LOG.info("Iniciando: {}", producto);
+        // producto en MDC: aparece en cada log dentro del bloque de este producto
+        MDC.put("producto", producto);
+        LOG.info("Iniciando scrape");
         ejecutarConReintentos(driver, wait, producto, browser);
+        MDC.remove("producto");
       }
     } finally {
       driver.quit();
+      MDC.clear();
     }
     System.exit(0);
   }
@@ -74,29 +94,28 @@ public class MercadoLibreScraper {
     int intento = 1;
 
     while (intento <= MAX_REINTENTOS) {
+      // intento en MDC: permite filtrar en Loki con | json | intento="2"
+      MDC.put("intento", String.valueOf(intento));
       try {
         procesarProducto(driver, wait, producto, browser);
+        MDC.remove("intento");
         return;
       } catch (Exception e) {
-        LOG.error(
-            "Fallo en intento {}/{} para '{}' ({}): {}",
-            intento,
-            MAX_REINTENTOS,
-            producto,
-            browser,
-            e.getMessage());
+        LOG.error("Fallo en intento", kv("error_msg", e.getMessage()), e);
         if (intento == MAX_REINTENTOS) {
-          LOG.error("Se agotaron los reintentos para: {}", producto);
+          LOG.error("Se agotaron los reintentos", kv("max_reintentos", MAX_REINTENTOS));
           break;
         }
-        LOG.info("Reintentando...");
+        LOG.info("Reintentando", kv("proximo_intento", intento + 1));
         intento++;
       }
     }
+    MDC.remove("intento");
   }
 
   static void procesarProducto(
       WebDriver driver, WebDriverWait wait, String producto, String browser) throws IOException {
+    Instant inicio = Instant.now();
     driver.get(URL_BASE);
 
     WebElement campo =
@@ -115,8 +134,14 @@ public class MercadoLibreScraper {
     List<ProductResult> resultados = extraerDatosConPaginacion(driver, wait, producto);
 
     PriceStats stats = PriceStats.calcular(resultados);
-    LOG.info("Stats: {}", producto);
     stats.imprimirResumen(producto);
+
+    long duracionMs = Duration.between(inicio, Instant.now()).toMillis();
+
+    // Mensaje exacto "Scrape completado" — usado por la query Q5 del Hit #4
+    // kv() convierte items_found y duration_ms en campos JSON extraíbles con | json
+    LOG.info(
+        "Scrape completado", kv("items_found", resultados.size()), kv("duration_ms", duracionMs));
 
     guardarJson(producto, resultados);
     PostgresWriter.guardar(producto, resultados, stats);
@@ -136,11 +161,11 @@ public class MercadoLibreScraper {
       List<ProductResult> paginaActual = extraerDatos(driver, producto);
       todos.addAll(paginaActual);
       LOG.info(
-          "Página {} — {} ítems extraídos (acumulado: {}/{})",
-          pagina,
-          paginaActual.size(),
-          todos.size(),
-          CANT_RESULTADOS);
+          "Página procesada",
+          kv("page", pagina),
+          kv("items_pagina", paginaActual.size()),
+          kv("items_acumulados", todos.size()),
+          kv("items_objetivo", CANT_RESULTADOS));
 
       if (todos.size() >= CANT_RESULTADOS || !irSiguientePagina(driver, wait)) {
         break;
@@ -202,7 +227,7 @@ public class MercadoLibreScraper {
 
         lista.add(pr);
       } catch (Exception e) {
-        LOG.warn("Error parcial en item {} de '{}': {}", i + 1, producto, e.getMessage());
+        LOG.warn("Error parcial en item", kv("item_index", i + 1), kv("error_msg", e.getMessage()));
       }
     }
     return lista;
@@ -262,7 +287,7 @@ public class MercadoLibreScraper {
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", enlace);
       esperarResultados(driver, wait, producto);
     } catch (Exception e) {
-      LOG.warn("Filtro '{}' no aplicado en '{}': {}", texto, producto, e.getMessage());
+      LOG.warn("Filtro no aplicado", kv("filtro", texto), kv("error_msg", e.getMessage()));
     }
   }
 
@@ -281,7 +306,7 @@ public class MercadoLibreScraper {
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", opcion);
       esperarResultados(driver, wait, producto);
     } catch (Exception e) {
-      LOG.warn("Orden '{}' no aplicado en '{}': {}", texto, producto, e.getMessage());
+      LOG.warn("Orden no aplicado", kv("orden", texto), kv("error_msg", e.getMessage()));
     }
   }
 
@@ -308,7 +333,7 @@ public class MercadoLibreScraper {
         .enable(SerializationFeature.INDENT_OUTPUT)
         .writeValue(destino.toFile(), resultados);
 
-    LOG.info("JSON guardado: {}", destino.toAbsolutePath());
+    LOG.info("JSON guardado", kv("path", destino.toAbsolutePath().toString()));
   }
 
   static void tomarScreenshot(WebDriver driver, String producto, String browser)
