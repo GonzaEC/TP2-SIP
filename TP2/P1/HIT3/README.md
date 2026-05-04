@@ -84,4 +84,6 @@ json{"timestamp":"2026-05-04T12:00:00Z","level":"INFO","logger":"ar.edu.sip.Merc
  "message":"Scrape completado","browser":"chrome","producto":"iPhone 16 Pro Max",
  "items_found":30,"duration_ms":4521}
 ```
-En Loki esto queda disponible con: {namespace="ml-scraper"} | json | producto="iPhone 16 Pro Max".
+En Loki esto queda disponible con: `{namespace="ml-scraper"} | json | producto="iPhone 16 Pro Max"`.
+
+PostgresWriter.java usa los mismos patrones, sin MDC propio. Como el MDC de producto ya está puesto en MercadoLibreScraper antes de llamar a `PostgresWriter.guardar()`, todos sus logs heredan ese campo automáticamente. Solo se agregó `kv()` en los logs de éxito y error.
