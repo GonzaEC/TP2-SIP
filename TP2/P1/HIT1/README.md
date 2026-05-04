@@ -113,4 +113,4 @@ Deben aparecer logs del propio stack. Eso prueba que el pipeline **Promtail → 
 
 ## Captura de validación
 
-![HIT1 - Grafana Explore](../../screenshots/hit1-stack.png)
+![HIT1 - Grafana Explore](/observability/screenshots/hi1-labels.png)

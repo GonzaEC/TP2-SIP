@@ -61,4 +61,4 @@ Y refinada por job:
 
 ## Captura de validación
 
-![HIT2 - Labels Kubernetes](../../screenshots/hit2-labels.png)
+![HIT2 - Labels Kubernetes](/observability/screenshots/hit2-labels.png)
