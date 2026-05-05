@@ -3,6 +3,11 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+echo "→ Preparación: crear /etc/machine-id en nodo k3d (requerido por Fluent Bit)"
+CLUSTER_NAME=$(kubectl config current-context | grep -o 'k3d-[^/]*' | head -1 || echo "k3d-mi-cluster")
+CONTAINER_NAME="${CLUSTER_NAME}-server-0"
+docker exec "$CONTAINER_NAME" sh -c "[ -f /etc/machine-id ] || echo '$(uuidgen 2>/dev/null || echo f47ac10b58cc4372a5670e02b2c3d479)' > /etc/machine-id" 2>/dev/null || true
+
 echo "→ Namespaces"
 kubectl create namespace elastic        --dry-run=client -o yaml | kubectl apply -f -
 kubectl create namespace elastic-system --dry-run=client -o yaml | kubectl apply -f -
