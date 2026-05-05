@@ -11,8 +11,6 @@ spec:
       config:
         node.roles: ["master", "data", "ingest"]
         node.store.allow_mmap: false
-        index.number_of_shards: 1
-        index.number_of_replicas: 0
       podTemplate:
         spec:
           containers:
@@ -21,7 +19,7 @@ spec:
                 - name: ES_JAVA_OPTS
                   value: "-Xms1g -Xmx1g"
               resources:
-                requests: { cpu: 500m,  memory: 1Gi }
+                requests: { cpu: 500m,  memory: 2Gi }
                 limits:   { cpu: 1000m, memory: 2Gi }
       volumeClaimTemplates:
         - metadata:
