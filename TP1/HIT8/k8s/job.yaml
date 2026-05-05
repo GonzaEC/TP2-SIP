@@ -26,8 +26,8 @@ spec:
               echo "PostgreSQL listo."
       containers:
         - name: scraper
-          image: ghcr.io/gonzaec/ml-scraper-hit8:latest
-          imagePullPolicy: Always
+          image: ml-scraper:hit3
+          imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:
                 name: scraper-config

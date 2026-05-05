@@ -49,6 +49,31 @@ sum by (producto) (
 **4. Justificación:**
 Aca sí se utiliza `rate` con una ventana corta `[1m]`. `rate` calcula el número de entradas por segundo, lo que es ideal para dibujar gráficos de series temporales que muestran la "velocidad" a la que el scraper está escupiendo advertencias. Nos permite ver picos (spikes) de bloqueos que la red de ML impone antes de que el scraper logre éxito.
 
+## Q3 — Conteo de filtros que no aparecieron por producto
+
+**1. Pregunta de negocio:** "¿Qué productos pierden el filtro tienda_oficial (ML lo oculta dinámicamente)?"
+
+**2. Query LogQL:**
+```logql
+sum by (producto) (
+  count_over_time(
+    {namespace="ml-scraper", app="scraper"}
+    | json
+    | message =~ "Filtro .* no aplicado.*"
+) [7d]
+  )
+)
+```
+
+**3. Output esperado:**
+| producto | value |
+|---|---|
+| iPhone 16 Pro Max | 2 |
+| Samsung Galaxy S24 | 5 |
+
+**4. Justificación:**
+Utiliza una expresión regular en el mensaje (`message =~ "Filtro .* no disponible"`) para atrapar cualquier tipo de advertencia de filtros faltantes que haya dejado nuestro scraper a lo largo de 7 días. Agrupar la suma por `producto` permite generar rápidamente gráficos de barras o tablas identificando cuáles son los productos conflictivos.
+
 ## Q4 — Duración media entre intentos de retry
 **1. Pregunta de negocio:** "¿El backoff exponencial está disparando como esperamos?"
 
@@ -76,12 +101,10 @@ A diferencia de las queries anteriores que cuentan líneas de log, aquí necesit
 
 **2. Query LogQL:**
 ```logql
-topk(1,
-  {namespace="ml-scraper", app="scraper"}
-    | json
-    | level="INFO"
-    | message="Scrape completado"
-) by (producto)
+{namespace="ml-scraper", app="scraper"}
+  | json
+  | level="INFO"
+  | message="Scrape completado"
 ```
 
 **3. Output esperado (Formato Tabla de logs crudos):**

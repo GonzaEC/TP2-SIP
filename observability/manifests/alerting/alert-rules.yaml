@@ -1,0 +1,51 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: scraper-health
+    folder: SIP 2026
+    interval: 1m
+    rules:
+      - uid: scrape-stale-24h
+        title: "Producto no scrapeado en 24h"
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: loki
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              expr: |
+                (time() - max(last_over_time(
+                  {namespace="ml-scraper", app="scraper"}
+                    | json | level="INFO" | message="Scrape completado"
+                    | unwrap timestamp [25h]
+                )) by (producto)) > 86400
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: "El producto {{ $labels.producto }} no se scrapea hace mas de 24h"
+        labels:
+          severity: warning
+      - uid: scrape-error-burst
+        title: "Fallo critico repetido del Cronjob"
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: loki
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              expr: |
+                sum by (producto) (
+                  count_over_time({namespace="ml-scraper", app="scraper"} | json | message="Se agotaron los reintentos" [10m])
+                ) > 0
+        noDataState: OK
+        execErrState: Alerting
+        for: 0m
+        annotations:
+          summary: "El scraper agotó los reintentos para {{ $labels.producto }}"
+        labels:
+          severity: critical

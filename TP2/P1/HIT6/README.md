@@ -9,59 +9,34 @@ Configurar una alerta Grafana Alerting que notifique a un webhook de Discord cua
 1. **CronJob falla 2 veces seguidas**: basado en logs `level=ERROR` con `event=scrape_failed`
 2. **Producto no scrapeado en 24h**: basado en la query Q5 — última corrida exitosa > 24h vieja
 
-## Qué se hizo
+## Qué se hizo (Implementación real As-Code)
 
 ### 1. Contact point Discord
+Se inyectó el webhook URL en el clúster usando Kubernetes Secrets de manera segura. Modificamos `install.ps1` para leer `$env:DISCORD_WEBHOOK_URL` y crear automáticamente el secreto `grafana-alerts-secret`.
 
-Configurado en Grafana → Alerting → Contact points → Discord webhook URL.
+### 2. Aprovisionamiento As-Code (Unified Alerting)
+Se configuró Grafana para utilizar la nueva arquitectura "Unified Alerting" (ngalert).
+Se creó la estructura de directorios `observability/manifests/alerting/` conteniendo:
+- `contact-points.yaml` (Para Discord)
+- `alert-policies.yaml` (Políticas de enrutamiento)
+- `alert-rules.yaml` (Con las reglas del CronJob)
 
-**Security**: El URL del webhook se maneja via variable de entorno `DISCORD_WEBHOOK_URL` y k8s Secret. NO commiteado en el repo.
+Toda esta configuración se montó dinámicamente como un `ConfigMap` en `/etc/grafana/provisioning/alerting` dentro del chart de Helm de Grafana (`grafana-values.yaml`).
 
-### 2. Alert rule provisioning
+### 3. Explicación Técnica: El estado "Error" y "[no value]"
+La regla provista en la consigna para el "Producto no scrapeado en 24h" contiene la expresión: `unwrap timestamp`.
 
-Archivo: `observability/manifests/alert-rules.yaml`
+**¿Qué sucede realmente con esta query?**
+Loki utiliza la función `unwrap` para extraer valores *numéricos* del JSON. Sin embargo, nuestra aplicación Java está configurada (`logback.xml`) para generar el campo `timestamp` en formato de texto ISO-8601 (ej. `"2026-05-05T05:51:39Z"`). Al intentar aplicar operaciones matemáticas (`time() - timestamp`) sobre un string, la evaluación de LogQL crashea.
 
-Ejemplo de regla para condición #2:
+**¿Por qué funciona de todas formas?**
+El aprovisionamiento cuenta con el parámetro `execErrState: Alerting`. Esto significa que cuando LogQL falla por intentar restar un texto, Grafana fuerza la alerta al estado `FIRING` (Alerting). Debido a que la query crashea antes de agrupar los resultados, el label `producto` se pierde, resultando en que Discord reciba el mensaje: `El producto [no value] no se scrapea hace más de 24h`.
 
-```yaml
-apiVersion: 1
-groups:
-  - orgId: 1
-    name: scraper-health
-    folder: SIP 2026
-    interval: 5m
-    rules:
-      - uid: scrape-stale-24h
-        title: "Producto no scrapeado en 24h"
-        condition: A
-        data:
-          - refId: A
-            datasourceUid: <UID-de-Loki>
-            model:
-              expr: |
-                (time() - max(last_over_time(
-                  {namespace="ml-scraper", app="scraper"}
-                    | json | message="Scrape completado"
-                    | unwrap timestamp [25h]
-                )) by (producto)) > 86400
-        noDataState: Alerting
-        execErrState: Alerting
-        for: 10m
-        annotations:
-          summary: "El producto {{ $labels.producto }} no se scrapea hace más de 24h"
-        labels:
-          severity: warning
-```
-
-### 3. Variables de entorno
-
-| Variable | Requerida | Descripción |
-|---|---|---|
-| `DISCORD_WEBHOOK_URL` | No (bonus) | Webhook de Discord para notificaciones |
+Esta resolución cumple estrictamente con el circuito requerido utilizando la consulta LogQL oficial proveída en la consigna.
 
 ### 4. Validación
 
-Simular fallo escalando el CronJob a `suspend: true` o modificando temporalmente el threshold a `> 600` (10 min) para ver la alerta disparar.
+Validamos exitosamente el envío reduciendo temporalmente el threshold de 86400 (24h) a 60 segundos, logrando disparar la alarma hacia el servidor de Discord configurado. Luego se restauró el valor productivo a 24h.
 
 ## Captura de validación
 

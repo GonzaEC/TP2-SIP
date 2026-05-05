@@ -3,6 +3,10 @@ admin:
   userKey: admin-user
   passwordKey: admin-password
 
+grafana.ini:
+  feature_toggles:
+    enable: ngalert
+
 persistence:
   enabled: true
   size: 1Gi
@@ -23,6 +27,7 @@ datasources:
     datasources:
       - name: Loki
         type: loki
+        uid: loki
         access: proxy
         url: http://loki.observability.svc.cluster.local:3100
         isDefault: true
@@ -42,9 +47,19 @@ dashboardProviders:
         options:
           path: /var/lib/grafana/dashboards/sip2026
 
-# Montar el ConfigMap del dashboard (Hit #5)
+# Montar los ConfigMaps
 extraConfigmapMounts:
   - name: scraper-overview-dashboard
     configMap: scraper-overview-dashboard
     mountPath: /var/lib/grafana/dashboards/sip2026
     readOnly: true
+  - name: scraper-alerting
+    configMap: scraper-alerting
+    mountPath: /etc/grafana/provisioning/alerting
+    readOnly: true
+
+envValueFrom:
+  DISCORD_WEBHOOK_URL:
+    secretKeyRef:
+      name: grafana-alerts-secret
+      key: discord-webhook-url
