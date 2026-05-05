@@ -17,11 +17,47 @@ Este directorio contiene la infraestructura para el stack de logging EFK del scr
 
 ## Instalación
 
-Para levantar el stack completo (Hit #1 al #3):
+### Requisitos Previos
+- Cluster k3d/k3s con al menos 8 GB RAM disponibles
+- `kubectl` y `helm` configurados
+- Acceso a Docker (para crear el cluster k3d)
+
+### Ejecución de HIT #1 (ECK Operator + Elasticsearch + Kibana)
+
+Para levantar el stack completo:
 
 ```bash
+cd efk
 chmod +x install.sh
 ./install.sh
+```
+
+El script automáticamente:
+1. Crea namespaces `elastic` y `elastic-system`
+2. Instala ECK Operator via Helm
+3. Despliega Elasticsearch y Kibana via CRDs
+4. Configura Fluent Bit como DaemonSet (HIT #2)
+5. Aplica ILM policy e index templates
+
+### Ejecución de HIT #2 (Validación de Fluent Bit)
+
+Fluent Bit se instala automáticamente en el paso anterior. Para verificar:
+
+```bash
+# Ver que el pod esté en Running
+kubectl -n elastic get pods
+
+# Ver logs de Fluent Bit sin errores
+kubectl -n elastic logs -l app.kubernetes.io/name=fluent-bit
+```
+
+Para validar que Fluent Bit está recolectando logs del scraper:
+
+```bash
+# 1. Crear un job del scraper (cuando esté disponible)
+kubectl -n ml-scraper create job --from=cronjob/scraper-hourly scraper-test-1
+
+# 2. Acceder a Kibana y verificar en Discover que aparecen logs en el índice scraper-logs-*
 ```
 
 ## Acceso
