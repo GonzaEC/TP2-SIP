@@ -1,0 +1,9 @@
+# El operator vigila todo el cluster pero corre en su propio namespace
+managedNamespaces: [elastic]
+
+resources:
+  requests: { cpu: 50m,  memory: 128Mi }
+  limits:   { cpu: 100m, memory: 256Mi }
+
+# El operator NO es la pieza que necesita HA en este TP
+replicaCount: 1

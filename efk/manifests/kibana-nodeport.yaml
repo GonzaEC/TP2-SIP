@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana-nodeport
+  namespace: elastic
+spec:
+  type: NodePort
+  selector:
+    common.k8s.elastic.co/type: kibana
+    kibana.k8s.elastic.co/name: scraper
+  ports:
+    - name: https
+      port: 5601
+      targetPort: 5601
+      nodePort: 30001
