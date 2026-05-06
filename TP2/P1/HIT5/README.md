@@ -45,4 +45,4 @@ Durante el despliegue se identificaron y solucionaron dos problemas críticos qu
 
 ## Captura de validación
 
-![HIT5 - Dashboard](../../screenshots/hit5-dashboard.png)
+![HIT5 - Dashboard](/observability/screenshots/hit5-dashboard.png)

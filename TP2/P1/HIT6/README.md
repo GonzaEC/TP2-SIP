@@ -40,4 +40,4 @@ Validamos exitosamente el envío reduciendo temporalmente el threshold de 86400 
 
 ## Captura de validación
 
-![HIT6 - Discord Alert](../../screenshots/hit6-discord-alert.png)
+![HIT6 - Discord Alert](/observability/screenshots/hit6-discord-alert.png)

@@ -31,9 +31,20 @@ helm upgrade --install promtail grafana/promtail \
   --values "$DIR/helm/promtail-values.yaml" \
   --wait --timeout 3m
 
+echo "→ Secret de alertas de Grafana (HIT 6)"
+DISCORD_WEBHOOK_URL="${DISCORD_WEBHOOK_URL:-https://discord.com/api/webhooks/dummy/dummy}"
+kubectl -n "$NAMESPACE" create secret generic grafana-alerts-secret \
+  --from-literal=discord-webhook-url="$DISCORD_WEBHOOK_URL" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
 echo "→ Dashboard ConfigMap"
 kubectl -n "$NAMESPACE" create configmap scraper-overview-dashboard \
   --from-file="scraper-overview.json=$DIR/dashboards/scraper-overview.json" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+echo "→ Alerting ConfigMap"
+kubectl -n "$NAMESPACE" create configmap scraper-alerting \
+  --from-file="$DIR/manifests/alerting" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "→ Grafana"

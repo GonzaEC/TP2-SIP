@@ -40,11 +40,10 @@ helm upgrade --install fluent-bit fluent/fluent-bit \
   --values "$DIR/helm/fluent-bit-values.yaml" \
   --wait --timeout 3m
 
-echo "→ ILM policy + index template"
+echo "→ ILM policy + index template (Hit #3)"
 PASSWORD=$(kubectl -n elastic get secret scraper-es-elastic-user -o jsonpath='{.data.elastic}' | base64 -d)
 kubectl -n elastic port-forward svc/scraper-es-http 9200:9200 >/dev/null 2>&1 &
 PF_ES=$!
-trap "kill $PF_ES 2>/dev/null || true" EXIT
 sleep 3
 
 curl -sk -u "elastic:$PASSWORD" -X PUT "https://localhost:9200/_ilm/policy/scraper-logs" \
@@ -63,7 +62,154 @@ curl -sk -u "elastic:$PASSWORD" -X PUT "https://localhost:9200/_index_template/s
     }
   }' >/dev/null
 
-# Nota: El import del dashboard (Hit #5) se agregará cuando el archivo .ndjson esté listo.
+kill "$PF_ES" 2>/dev/null || true
+
+echo "→ Dashboard Kibana (Hit #5) — import via Saved Objects API"
+kubectl -n elastic port-forward svc/scraper-kb-http 5601:5601 >/dev/null 2>&1 &
+PF_KB=$!
+sleep 5
+
+curl -sk -u "elastic:$PASSWORD" \
+  -X POST "https://localhost:5601/api/saved_objects/_import?overwrite=true" \
+  -H "kbn-xsrf: true" \
+  -F file=@"$DIR/dashboards/scraper-overview.ndjson" | jq '.success'
+# Esperado: true
+
+kill "$PF_KB" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# Hit #6 (bonus +5%) — Kibana Alerting: conector + regla de alerta
+# Nota: el connector .webhook requiere licencia Gold+. Con licencia básica
+# se usa .index connector + script alert-monitor.py para enviar a Discord.
+# ---------------------------------------------------------------------------
+if [ -n "${DISCORD_WEBHOOK_URL:-}" ]; then
+  echo "→ Hit #6 (bonus) — Kibana Alerting: conector + regla de alerta"
+
+  kubectl -n elastic port-forward svc/scraper-kb-http 5601:5601 >/dev/null 2>&1 &
+  PF_KB6=$!
+  sleep 5
+
+  # Intentar crear connector Webhook (requiere licencia Gold+)
+  echo "  Intentando crear connector .webhook..."
+  CONNECTOR_ID=$(curl -sk -u "elastic:$PASSWORD" \
+    -X POST "https://localhost:5601/s/default/api/actions/connector" \
+    -H "kbn-xsrf: true" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"name\": \"discord-sip2026\",
+      \"connector_type_id\": \".webhook\",
+      \"config\": {
+        \"url\": \"${DISCORD_WEBHOOK_URL}\",
+        \"method\": \"post\",
+        \"headers\": { \"Content-Type\": \"application/json\" }
+      }
+    }" 2>/dev/null | jq -r '.id // empty')
+
+  if [ -n "$CONNECTOR_ID" ]; then
+    echo "  ✓ Connector .webhook creado — ID: $CONNECTOR_ID"
+    CONNECTOR_TYPE="webhook"
+  else
+    echo "  ⚠ License básica no soporta .webhook — usando .index connector"
+    # Crear connector .index (disponible en licencia básica)
+    CONNECTOR_ID=$(curl -sk -u "elastic:$PASSWORD" \
+      -X POST "https://localhost:5601/s/default/api/actions/connector" \
+      -H "kbn-xsrf: true" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "alert-index",
+        "connector_type_id": ".index",
+        "config": {
+          "index": ".alerts-scraper",
+          "executionTimeField": "@timestamp"
+        }
+      }' | jq -r '.id')
+    echo "  ✓ Connector .index creado — ID: $CONNECTOR_ID"
+    CONNECTOR_TYPE="index"
+  fi
+
+  # Crear la regla: más de 5 ERRORs en 1h, chequeo cada 5m
+  if [ "$CONNECTOR_TYPE" = "webhook" ]; then
+    # Connector webhook: envía directo a Discord
+    curl -sk -u "elastic:$PASSWORD" \
+      -X POST "https://localhost:5601/s/default/api/alerting/rule" \
+      -H "kbn-xsrf: true" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"name\": \"Scraper: mas de 5 ERRORs en 1h\",
+        \"rule_type_id\": \".es-query\",
+        \"consumer\": \"alerts\",
+        \"schedule\": { \"interval\": \"5m\" },
+        \"params\": {
+          \"index\": [\"scraper-logs-*\"],
+          \"timeField\": \"@timestamp\",
+          \"searchType\": \"esQuery\",
+          \"esQuery\": \"{\\\"query\\\":{\\\"bool\\\":{\\\"must\\\":[{\\\"term\\\":{\\\"level.keyword\\\":\\\"ERROR\\\"}}]}}}\",
+          \"size\": 100,
+          \"threshold\": [5],
+          \"thresholdComparator\": \">\",
+          \"timeWindowSize\": 1,
+          \"timeWindowUnit\": \"h\"
+        },
+        \"actions\": [
+          {
+            \"id\": \"${CONNECTOR_ID}\",
+            \"group\": \"query matched\",
+            \"frequency\": {
+              \"summary\": true,
+              \"notify_when\": \"onActionGroupChange\"
+            },
+            \"params\": {
+              \"body\": \"{\\\"content\\\": \\\"ALERTA SIP 2026 (EFK): {{context.hits}} errores del scraper en 1h. Producto top: {{context.value}}\\\"}\"
+            }
+          }
+        ]
+      }" | jq '.id'
+  else
+    # Connector index: escribe alertas en índice (script alert-monitor.py las envía a Discord)
+    curl -sk -u "elastic:$PASSWORD" \
+      -X POST "https://localhost:5601/s/default/api/alerting/rule" \
+      -H "kbn-xsrf: true" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"name\": \"Scraper: mas de 5 ERRORs en 1h\",
+        \"rule_type_id\": \".es-query\",
+        \"consumer\": \"alerts\",
+        \"schedule\": { \"interval\": \"5m\" },
+        \"params\": {
+          \"index\": [\"scraper-logs-*\"],
+          \"timeField\": \"@timestamp\",
+          \"searchType\": \"esQuery\",
+          \"esQuery\": \"{\\\"query\\\":{\\\"bool\\\":{\\\"must\\\":[{\\\"term\\\":{\\\"level.keyword\\\":\\\"ERROR\\\"}}]}}}\",
+          \"size\": 100,
+          \"threshold\": [5],
+          \"thresholdComparator\": \">\",
+          \"timeWindowSize\": 1,
+          \"timeWindowUnit\": \"h\"
+        },
+        \"actions\": [
+          {
+            \"id\": \"${CONNECTOR_ID}\",
+            \"group\": \"query matched\",
+            \"frequency\": {
+              \"summary\": true,
+              \"notify_when\": \"onActionGroupChange\"
+            },
+            \"params\": {
+              \"document\": {
+                \"subject\": \"ALERTA SIP 2026 (EFK): {{context.hits}} errores del scraper en 1h\",
+                \"message\": \"Producto top: {{context.value}}\"
+              }
+            }
+          }
+        ]
+      }" | jq '.id'
+    echo "  → Para enviar alertas a Discord: DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL} python efk/scripts/alert-monitor.py"
+  fi
+
+  kill "$PF_KB6" 2>/dev/null || true
+else
+  echo "-- Hit #6 omitido (DISCORD_WEBHOOK_URL no definido)"
+fi
 
 NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
 echo ""
@@ -73,4 +219,7 @@ echo "✓ Kibana available"
 echo "✓ Fluent Bit DaemonSet ready"
 echo "✓ ILM policy 'scraper-logs' aplicada"
 echo "✓ Index template asociado"
+echo "✓ Index pattern 'scraper-logs-*' creado"
+echo "✓ Dashboard 'Scraper Overview' provisionado"
+echo "✓ Alert rule 'Scraper: mas de 5 ERRORs en 1h' configurada"
 echo "→ Abrir https://${NODE_IP}:30001   (elastic / \$(kubectl -n elastic get secret scraper-es-elastic-user -o jsonpath='{.data.elastic}' | base64 -d))"

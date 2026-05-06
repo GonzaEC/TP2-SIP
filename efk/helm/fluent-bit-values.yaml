@@ -23,9 +23,15 @@ extraVolumes:
   - name: es-certs
     secret:
       secretName: scraper-es-http-certs-public
+  - name: lua-scripts
+    configMap:
+      name: fluent-bit-lua-scripts
 extraVolumeMounts:
   - name: es-certs
     mountPath: /etc/fluent-bit/certs
+    readOnly: true
+  - name: lua-scripts
+    mountPath: /fluent-bit/etc/conf
     readOnly: true
 
 env:
@@ -41,6 +47,7 @@ config:
         Daemon         Off
         Flush          5
         Log_Level      info
+        Parsers_File   /fluent-bit/etc/parsers.conf
         Parsers_File   /fluent-bit/etc/conf/custom_parsers.conf
         HTTP_Server    On
         HTTP_Listen    0.0.0.0
@@ -77,7 +84,7 @@ config:
         Match   kube.*
         Regex   $kubernetes['labels']['app'] ^scraper$
 
-    # Parsea el JSON-line emitido por el scraper
+    # Parsea el JSON-line emitido por el scraper (si el log es JSON)
     [FILTER]
         Name         parser
         Match        kube.*
@@ -85,6 +92,29 @@ config:
         Parser       json_scraper
         Reserve_Data On
         Preserve_Key Off
+
+    # Si no es JSON, parsea el texto plano con regex para extraer level, logger, message
+    [FILTER]
+        Name         parser
+        Match        kube.*
+        Key_Name     message
+        Parser       scraper_regex
+        Reserve_Data On
+        Preserve_Key On
+
+    # Extrae el nombre del producto desde el mensaje
+    [FILTER]
+        Name    lua
+        Match   kube.*
+        script  /fluent-bit/etc/conf/product_extractor.lua
+        call    extract_product
+
+    # Detecta eventos especiales y agrega campo event
+    [FILTER]
+        Name    lua
+        Match   kube.*
+        script  /fluent-bit/etc/conf/product_extractor.lua
+        call    extract_event
 
   outputs: |
     [OUTPUT]
@@ -105,16 +135,22 @@ config:
         Retry_Limit       5
 
   customParsers: |
-    [PARSER]
-        Name        cri
-        Format      regex
-        Regex       ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<logtag>[^ ]*) (?<log>.*)$
-        Time_Key    time
-        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
-
+    # Nota: el parser 'cri' ya viene built-in en Fluent Bit 3.x (parsers.conf).
+    # Redefinirlo aquí causaba "already exists, skip" y Fluent Bit dejaba de
+    # procesar el resto del archivo, dejando json_scraper sin cargar.
     [PARSER]
         Name         json_scraper
         Format       json
         Time_Key     timestamp
         Time_Format  %Y-%m-%dT%H:%M:%S%z
+        Time_Keep    On
+
+    # Parser regex para logs del scraper en formato Java/logback:
+    # 03:16:27.656 INFO  [a.e.s.MercadoLibreScraper] Iniciando: bicicleta rodado 29
+    [PARSER]
+        Name         scraper_regex
+        Format       regex
+        Regex        ^(?<time>\d{2}:\d{2}:\d{2}\.\d{3})\s+(?<level>INFO|WARN|ERROR|DEBUG|WARNING)\s+\[(?<logger>[^\]]+)\]\s+(?<message>.*)$
+        Time_Key     time
+        Time_Format  %H:%M:%S.%L
         Time_Keep    On

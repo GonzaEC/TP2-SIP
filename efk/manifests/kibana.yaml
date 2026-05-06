@@ -8,6 +8,13 @@ spec:
   count: 1
   elasticsearchRef:
     name: scraper
+  config:
+    xpack.actions.allowedActionTypes:
+      - .webhook
+      - .index
+      - .server-log
+      - .email
+      - .slack
   podTemplate:
     spec:
       containers:

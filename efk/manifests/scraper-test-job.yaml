@@ -1,0 +1,19 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scraper-hit4-test
+  namespace: ml-scraper
+spec:
+  template:
+    metadata:
+      labels:
+        app: scraper
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: scraper
+          image: ghcr.io/gonzaec/ml-scraper:latest
+          imagePullPolicy: Always
+          env:
+            - name: SELENIUM_HEADLESS
+              value: "true"

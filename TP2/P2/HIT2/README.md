@@ -27,12 +27,25 @@ Este es el paso clave. Los logs del scraper ya vienen en JSON estructurado (Hit 
     Time_Format  %Y-%m-%dT%H:%M:%S%z
 ```
 
-#### C. Filter (kubernetes & grep)
+#### C. Filter (kubernetes & grep & parser)
 - **kubernetes**: Enriquece los logs con el nombre del pod, namespace y labels.
 - **grep**: Filtra y descarta cualquier log que no pertenezca al label `app=scraper`, asegurando que Elasticsearch solo reciba logs del negocio.
+- **parser**: Aplica `json_scraper` sobre el campo `log` para expandir los campos JSON a primer nivel.
 
 #### D. Output (es)
 Envía los datos a `scraper-es-http.elastic.svc.cluster.local:9200`. Usa la convención `Logstash_Prefix scraper-logs` para generar índices diarios como `scraper-logs-2026.05.05`.
+
+> **Por qué `Logstash_Format` si no hay Logstash:** el output `es` de Fluent Bit heredó la convención de índices con sufijo de fecha de Logstash (`scraper-logs-YYYY.MM.DD`). Tener un índice por día es lo que después permite el rollover de ILM (Hit #3) sin scripts adicionales.
+
+#### E. Parsers_File — dos líneas requeridas
+
+En el bloque `[SERVICE]` se declaran dos rutas:
+```ini
+Parsers_File   /fluent-bit/etc/parsers.conf
+Parsers_File   /fluent-bit/etc/conf/custom_parsers.conf
+```
+
+La primera es el archivo de parsers built-in del contenedor. La segunda es donde el Helm chart monta el contenido de `config.customParsers`. Omitir la segunda línea impide que se carguen los parsers `cri` y `json_scraper` definidos en `customParsers`, dejando los logs sin parsear.
 
 ## Verificación
 

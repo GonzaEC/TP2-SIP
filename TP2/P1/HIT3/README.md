@@ -55,7 +55,7 @@ En el panel **Detected fields** deben aparecer: `level`, `producto`, `browser`, 
 
 ## Captura de validación
 
-![HIT3 - JSON Fields](../../screenshots/hit3-json-fields.png)
+![HIT3 - JSON Fields](/observability/screenshots/hit3-json-fields.png)
 
 ## QUE SE CAMBIO
 ```bash

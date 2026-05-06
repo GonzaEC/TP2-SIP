@@ -1,0 +1,84 @@
+-- Extrae el nombre del producto desde el mensaje del scraper
+-- Patrones soportados:
+--   "Iniciando: bicicleta rodado 29"
+--   "JSON guardado: /app/output/bicicleta_rodado_29.json"
+--   "Filtro 'Nuevo' no aplicado en 'GeForce RTX 5090'"
+--   "Filtro 'Solo tiendas oficiales' no aplicado en 'GeForce RTX 5090'"
+
+function extract_product(tag, timestamp, record)
+    local message = record["message"]
+    if message == nil then
+        return 0, 0, 0
+    end
+
+    local producto = nil
+
+    -- Patrón 1: "Iniciando: <producto>"
+    local match = string.match(message, "Iniciando:%s+(.+)$")
+    if match then
+        producto = match
+    end
+
+    -- Patrón 2: "JSON guardado: /app/output/<producto>.json"
+    if not producto then
+        match = string.match(message, "JSON guardado:%s+/app/output/(.+)%.json$")
+        if match then
+            producto = match
+        end
+    end
+
+    -- Patrón 3: "Filtro '...' no aplicado en '<producto>'"
+    if not producto then
+        match = string.match(message, "no aplicado en '([^']+)'")
+        if match then
+            producto = match
+        end
+    end
+
+    -- Patrón 4: "scrape_completado" event with product
+    if not producto then
+        match = string.match(message, "producto[%s]*=[%s]*([^,}]+)")
+        if match then
+            producto = match
+        end
+    end
+
+    if producto then
+        record["producto"] = producto
+    end
+
+    return 1, timestamp, record
+end
+
+-- Extrae el tipo de evento desde el mensaje
+-- Patrones:
+--   "scrape_completado" -> event = "scrape_completado"
+--   "scrape_iniciado" -> event = "scrape_iniciado"
+--   "Iniciando:" -> event = "scrape_iniciado"
+--   "JSON guardado:" -> event = "scrape_completado"
+
+function extract_event(tag, timestamp, record)
+    local message = record["message"]
+    if message == nil then
+        return 0, 0, 0
+    end
+
+    local event = nil
+
+    -- Busca patrones de evento en el mensaje
+    if string.find(message, "scrape_completado") then
+        event = "scrape_completado"
+    elseif string.find(message, "scrape_iniciado") then
+        event = "scrape_iniciado"
+    elseif string.find(message, "Iniciando:") then
+        event = "scrape_iniciado"
+    elseif string.find(message, "JSON guardado:") then
+        event = "scrape_completado"
+    end
+
+    if event then
+        record["event"] = event
+    end
+
+    return 1, timestamp, record
+end
