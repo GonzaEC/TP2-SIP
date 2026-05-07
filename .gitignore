@@ -1,0 +1,25 @@
+# Claude Code setting
+.claude/
+
+# Secrets y configuración local
+*.env
+.env.*
+secrets/
+
+# Logs locales
+*.log
+logs/
+
+# Build artifacts Java
+target/
+*.jar
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
