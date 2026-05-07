@@ -19,17 +19,19 @@ Kibana soporta dos lenguajes de query en Discover:
 
 ## Queries implementadas
 
-El cookbook completo está en [`efk/queries/kql-cookbook.md`](../../../efk/queries/kql-cookbook.md).
+El cookbook completo con explicaciones técnicas y comparativas LogQL está en [`efk/queries/kql-cookbook.md`](../../../efk/queries/kql-cookbook.md).
 
 | # | Pregunta de negocio | Query KQL |
 |---|---|---|
 | Q1 | Errores por producto en las últimas 24h | `level: "ERROR" and producto: *` |
-| Q2 | Top selectores faltantes (filtros ocultos por ML) | `message: "Filtro * no disponible" and producto: *` |
-| Q3 | Distribución de duración del Job | `event: "scrape_completado" and job_duration_ms >= 0` |
+| Q2 | Top selectores faltantes (filtros ocultos por MercadoLibre) | `message: *no aplicado* and producto: *` |
+| Q3 | Distribución de eventos del Job por tipo | `event: *` |
 | Q4 | Timeouts de Selenium en cualquier producto | `message: *timeout* and (logger: "selenium*" or logger: "extractors")` |
-| Q5 | Todos los logs de un CronJob específico | `kubernetes.labels.job_name: "scraper-test-1"` |
+| Q5 | Todos los logs de un CronJob específico | `kubernetes.labels.job-name: "scraper-run-1"` |
 | Q6 | Errores sin el ruido de reconexiones de Postgres | `level: "ERROR" and not logger: "psycopg*"` |
-| Q7 | Última corrida exitosa por producto | `event: "scrape_completado" and level: "INFO" and items_found >= 1` |
+| Q7 | Última corrida exitosa por producto | `event: "scrape_completado" and level: "INFO"` |
+
+> **Nota sobre Q5**: el campo usa guión `job-name` (no underscore `job_name`) porque Fluent Bit preserva el nombre original del label de Kubernetes.
 
 ## Cómo correr las queries
 
@@ -42,14 +44,14 @@ El cookbook completo está en [`efk/queries/kql-cookbook.md`](../../../efk/queri
 
 - **`keyword` field vs `text` field**: búsquedas sobre `level.keyword` o `producto.keyword` son O(1) en el inverted index. Wildcards sobre `message` (campo `text`) requieren full scan de términos.
 - **Leading wildcard** (`message: *timeout*`): el más costoso — Elasticsearch no puede usar el índice, debe escanear todos los términos. Aceptable en < 1M docs, problemático a escala.
-- **Range query numérica** (`job_duration_ms >= 0`): usa BKD tree (estructura de datos de Lucene para rangos numéricos) — extremadamente eficiente.
+- **`kubernetes.labels.job-name`**: campo `keyword` enriquecido automáticamente por el Fluent Bit Kubernetes filter. Lookup directa en el inverted index — sub-milisegundo.
 
 ## Comparativa con LogQL (Parte 1)
 
-Ver tabla al final de [`efk/queries/kql-cookbook.md`](../../../efk/queries/kql-cookbook.md) con la comparación directa query por query. Diferencia clave: LogQL opera sobre **streams con ventana temporal explícita**; KQL filtra **documentos** y delega el rango temporal al time picker de Kibana.
+Ver tabla al final de [`efk/queries/kql-cookbook.md`](../../../efk/queries/kql-cookbook.md). Diferencia clave: LogQL opera sobre **streams con ventana temporal explícita en la query**; KQL filtra **documentos** y delega el rango temporal al time picker de Kibana.
 
 ## Archivos relevantes
 
 | Archivo | Descripción |
 |---|---|
-| `efk/queries/kql-cookbook.md` | Las 7 queries completas con justificación técnica |
+| `efk/queries/kql-cookbook.md` | Las 7 queries completas con justificación técnica y comparativa LogQL |

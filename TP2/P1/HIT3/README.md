@@ -2,88 +2,113 @@
 
 ## Objetivo
 
-Migrar el módulo de logging del scraper para emitir **JSON line-delimited a stdout** en lugar de texto plano, permitiendo que Loki extraiga campos automáticamente y se puedan hacer queries con `| json`.
+Migrar el módulo de logging del scraper (Java) para emitir **JSON line-delimited a stdout** en lugar de texto plano, permitiendo que Loki extraiga campos automáticamente y se puedan hacer queries con `| json`.
 
 ## Qué se hizo
 
-### 1. Cambio en `logging_setup.py`
+El scraper es una aplicación Java que usa **SLF4J + Logback**. Se reemplazó el `PatternLayout` (texto plano) por el `LogstashEncoder` de la biblioteca `logstash-logback-encoder`.
 
-Se reemplazó el formatter de texto plano por `JsonFormatter` de `python-json-logger >= 3.2.0`:
+### 1. Dependencia en `pom.xml`
 
-```python
-from pythonjsonlogger.json import JsonFormatter
+**Archivo**: `TP1/HIT8/pom.xml`
 
-json_formatter = JsonFormatter(
-    "%(asctime)s %(levelname)s %(name)s %(message)s",
-    rename_fields={"asctime": "timestamp", "levelname": "level", "name": "logger"},
-    timestamp=True,
-)
+```xml
+<!-- JSON structured logging (Hit #3) -->
+<dependency>
+    <groupId>net.logstash.logback</groupId>
+    <artifactId>logstash-logback-encoder</artifactId>
+    <version>7.4</version>
+</dependency>
 ```
 
-### 2. Enriquecimiento con `extra=`
+### 2. Cambio en `logback.xml`
 
-Los call-sites ahora pasan contexto estructurado:
+**Archivo**: `TP1/HIT8/src/main/resources/logback.xml`
 
-```python
-logger.info(
-    "Scrape iniciado",
-    extra={"producto": producto, "browser": browser, "page": page},
-)
-logger.error(
-    "Timeout tras 3 reintentos",
-    extra={"producto": producto, "selector": selector, "attempts": 3},
-    exc_info=True,
-)
+Se reemplazó el appender CONSOLE de `PatternLayout` (texto plano) por `LogstashEncoder` (JSON). El appender FILE queda en texto plano para debugging local dentro del pod.
+
+```xml
+<appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+  <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+    <fieldNames>
+      <timestamp>timestamp</timestamp>
+      <level>level</level>
+      <logger>logger</logger>
+      <message>message</message>
+      <stackTrace>stack_trace</stackTrace>
+    </fieldNames>
+    <!-- Campos MDC incluidos como campos JSON de primer nivel -->
+    <includeMdcKeyName>producto</includeMdcKeyName>
+    <includeMdcKeyName>browser</includeMdcKeyName>
+    <includeMdcKeyName>intento</includeMdcKeyName>
+  </encoder>
+</appender>
 ```
 
-### 3. Validación con LogQL
+### 3. Enriquecimiento con MDC y StructuredArguments
 
-En Grafana → Explore:
+**Archivo**: `TP1/HIT8/src/main/java/ar/edu/sip/MercadoLibreScraper.java`
 
+Se usan dos mecanismos para agregar campos estructurados:
+
+**MDC** (`org.slf4j.MDC`) — para campos que aplican a todo un bloque de logs:
+```java
+MDC.put("browser", browser);     // aparece en todos los logs de la ejecución
+MDC.put("producto", producto);   // aparece en todos los logs de ese producto
+MDC.put("intento", String.valueOf(intento)); // aparece en logs del retry actual
 ```
-{namespace="ml-scraper", app="scraper"} | json
+
+**StructuredArguments.kv()** — para campos puntuales de un evento:
+```java
+LOG.info("Scrape completado", kv("items_found", resultados.size()), kv("duration_ms", duracionMs));
+LOG.warn("Filtro no aplicado", kv("filtro", texto), kv("error_msg", e.getMessage()));
 ```
 
-En el panel **Detected fields** deben aparecer: `level`, `producto`, `browser`, `logger`, `message`, `timestamp`.
+`PostgresWriter.java` usa los mismos patrones. Como el MDC de `producto` ya está puesto en `MercadoLibreScraper` antes de llamar a `PostgresWriter.guardar()`, todos sus logs heredan ese campo automáticamente.
+
+### 4. Resultado en stdout (JSON por línea)
+
+```json
+{"timestamp":"2026-05-07T01:17:35Z","level":"INFO","logger":"ar.edu.sip.MercadoLibreScraper","message":"Scrape completado","browser":"chrome","producto":"GeForce RTX 5090","intento":"1","items_found":3,"duration_ms":63324}
+```
+
+### 5. Validación con LogQL
+
+En Grafana → Explore → datasource Loki:
+
+```logql
+{namespace="ml-scraper"} | json
+```
+
+En el panel **Detected fields** aparecen: `level`, `producto`, `browser`, `logger`, `message`, `timestamp`, `intento`.
+
+Para filtrar por producto específico:
+```logql
+{namespace="ml-scraper"} | json | producto="GeForce RTX 5090"
+```
 
 ## Antes vs Después
 
-| Formato | Ejemplo |
+| Formato | Ejemplo de log |
 |---|---|
-| **Plain text (antes)** | `2026-05-10T03:14:22-0300 \| INFO \| extractors \| Scrapeando página 1` |
-| **JSON (después)** | `{"timestamp": "2026-05-10T03:14:22Z", "level": "INFO", "logger": "extractors", "message": "Scrape iniciado", "producto": "iphone", "browser": "chrome", "page": 1}` |
+| **Antes** (texto plano) | `01:02:49.615 INFO  [a.e.s.MercadoLibreScraper] JSON guardado: /app/output/geforce_rtx_5090.json` |
+| **Después** (JSON) | `{"timestamp":"2026-05-07T01:17:35Z","level":"INFO","logger":"ar.edu.sip.MercadoLibreScraper","message":"JSON guardado","producto":"GeForce RTX 5090","browser":"chrome"}` |
 
-## Captura de validación
+## Archivos modificados
 
-![HIT3 - JSON Fields](/observability/screenshots/hit3-json-fields.png)
+| Archivo | Cambio |
+|---|---|
+| `TP1/HIT8/pom.xml` | Agrega dependencia `logstash-logback-encoder 7.4` |
+| `TP1/HIT8/src/main/resources/logback.xml` | CONSOLE usa `LogstashEncoder`; FILE mantiene texto plano |
+| `TP1/HIT8/src/main/java/ar/edu/sip/MercadoLibreScraper.java` | MDC + `StructuredArguments.kv()` |
+| `TP1/HIT8/src/main/java/ar/edu/sip/PostgresWriter.java` | `kv()` en logs de éxito y error |
 
-## QUE SE CAMBIO
-```bash
-TP1/HIT8/pom.xml
-TP1/HIT8/src/main/java/ar/edu/sip/MercadoLibreScraper.java
-TP1/HIT8/src/main/java/ar/edu/sip/PostgresWriter.java
-TP1/HIT8/src/main/resources/logback.xml
-```
-Se agrego logstash.encoder.version 7.4 al pom.xml
-logback.xml se modifico el CONSOLE para que cambe de encoder. El FILE queda igual (texto plano para debugging local). Solo el CONSOLE pasa de PatternLayout a LogstashEncoder, que es quien emite el JSON que Promtail va a leer.
-MercadoLibreScraper.java tiene 2 mecanismos nuevos:
-* MDC (org.slf4j.MDC) para campos que aplican a todo un bloque de logs:
-```
-MDC.put("browser", browser) → aparece en todos los logs de la ejecución
-MDC.put("producto", producto) → aparece en todos los logs de ese producto
-MDC.put("intento", ...) → aparece en logs del retry actual
-```
-* kv() (StructuredArguments.kv) para campos puntuales de un evento:
-```java
-javaLOG.info("Scrape completado", kv("items_found", resultados.size()), kv("duration_ms", duracionMs));
-LOG.warn("Filtro no aplicado", kv("filtro", texto), kv("error_msg", e.getMessage()));
-```
-El resultado en stdout es:
-```bash
-json{"timestamp":"2026-05-04T12:00:00Z","level":"INFO","logger":"ar.edu.sip.MercadoLibreScraper",
- "message":"Scrape completado","browser":"chrome","producto":"iPhone 16 Pro Max",
- "items_found":30,"duration_ms":4521}
-```
-En Loki esto queda disponible con: `{namespace="ml-scraper"} | json | producto="iPhone 16 Pro Max"`.
+## Capturas de validación
 
-PostgresWriter.java usa los mismos patrones, sin MDC propio. Como el MDC de producto ya está puesto en MercadoLibreScraper antes de llamar a `PostgresWriter.guardar()`, todos sus logs heredan ese campo automáticamente. Solo se agregó `kv()` en los logs de éxito y error.
+### Antes — logs en texto plano (sin LogstashEncoder)
+
+![HIT3 - Antes](/observability/screenshots/hit3-antes.png)
+
+### Después — logs JSON estructurados con campos extraídos por `| json`
+
+![HIT3 - Después](/observability/screenshots/hit3-despues.png)

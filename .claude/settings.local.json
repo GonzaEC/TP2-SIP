@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(k3d cluster *)",
-      "PowerShell(wsl helm version 2>&1)"
-    ]
-  }
-}

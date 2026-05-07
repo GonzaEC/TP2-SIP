@@ -100,7 +100,7 @@ DISCORD_WEBHOOK_URL=<tu-webhook> ES_PASSWORD=<password> python efk/scripts/alert
 | Variable | Descripción | Ejemplo |
 |---|---|---|
 | `DISCORD_WEBHOOK_URL` | URL del webhook de Discord | `https://discord.com/api/webhooks/...` |
-| `ES_PASSWORD` | Password del usuario elastic | `7BWC3PU9Fm4kr88Cb05rq70s` |
+| `ES_PASSWORD` | Password del usuario elastic | Generada por ECK — ver secret `scraper-es-elastic-user` |
 | `ES_URL` | URL de Elasticsearch (opcional) | `https://scraper-es-http.elastic.svc:9200` |
 
 ### 5. Verificación

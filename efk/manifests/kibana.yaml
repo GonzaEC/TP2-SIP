@@ -8,13 +8,8 @@ spec:
   count: 1
   elasticsearchRef:
     name: scraper
-  config:
-    xpack.actions.allowedActionTypes:
-      - .webhook
-      - .index
-      - .server-log
-      - .email
-      - .slack
+  # xpack.actions.allowedActionTypes fue removido en Kibana 8.x.
+  # Los connectors (.webhook, .index, etc.) están habilitados por defecto.
   podTemplate:
     spec:
       containers:

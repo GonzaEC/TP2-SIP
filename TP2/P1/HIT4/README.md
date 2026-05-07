@@ -41,13 +41,13 @@ sum by (producto) (
   count_over_time(
     {namespace="ml-scraper", app="scraper"}
       | json
-      | message =~ "Filtro .* no disponible"
+      | message =~ "Filtro .* no aplicado"
     [7d]
   )
 )
 ```
 
-**Por qué**: Regex en `message` para capturar el patrón de filtro no disponible. Ventana de 7 días para ver tendencias.
+**Por qué**: Regex en `message` para capturar el patrón de filtro no aplicado (el scraper loguea `"Filtro 'X' no aplicado en 'Producto Y'"`). Ventana de 7 días para ver tendencias.
 
 ### Q4 — Duración media entre intentos de retry
 
@@ -83,3 +83,7 @@ topk(1,
 ## Archivo
 
 Las queries están documentadas en `observability/queries/logql-cookbook.md`.
+
+## Captura de validación
+
+![HIT4 - LogQL Queries](/observability/screenshots/hit4-image.jpg)
