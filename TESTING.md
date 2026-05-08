@@ -1,179 +1,124 @@
-# Testing Guide — P2/HIT1 + HIT2 + Scraper Integration
+# Testing Guide — TP2 Part 1 + Part 2 + Part 3
 
-Guía completa para probar P2/HIT1, P2/HIT2 y el scraper real en un flujo end-to-end.
+Guía completa para probar los stacks de observabilidad (Loki, EFK y OpenTelemetry) en un flujo end-to-end.
 
 ---
 
-## Pre-requisitos
+## 0. Preparación del Cluster
 
-- **k3d cluster** creado y corriendo (`k3d-mi-cluster` o similar)
-- **kubectl** y **helm** configurados
-- Docker corriendo en el host
+Antes de empezar, asegurate de tener un cluster limpio de **k3d**.
 
-Verificar:
+### 0.1 Crear Cluster k3d
 ```bash
-kubectl get nodes
-# NAME                   STATUS   ROLES              AGE
-# k3d-mi-cluster-server-0  Ready    control-plane,master  Xm
+k3d cluster create scraper \
+  --servers 1 \
+  --agents 0 \
+  --port "30000-30100:30000-30100@server:0" \
+  --port "8080:80@loadbalancer"
+```
+
+### 0.2 Exportar variables de entorno
+```bash
+# Requerido para Grafana (Parte 1)
+export GRAFANA_ADMIN_PASSWORD='admin'
+
+# Opcional (si querés probar alertas en Discord)
+export DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/...'
 ```
 
 ---
 
-## 1. Desplegar Stack EFK (P2/HIT1 + HIT2)
+## 1. Desplegar Stacks Previos (Pre-requisitos para Parte 3)
 
-### 1.1 Navegar a la carpeta
+Para que OpenTelemetry pueda hacer fan-out, los backends deben estar activos.
+
+### 1.1 Parte 1 — Loki + Promtail + Grafana
+```bash
+cd observability
+chmod +x install.sh
+./install.sh
+cd ..
+```
+
+### 1.2 Parte 2 — EFK (Elasticsearch + Kibana + Fluent Bit)
 ```bash
 cd efk
 chmod +x install.sh
+./install.sh
+cd ..
 ```
 
-### 1.2 Ejecutar instalación
+---
+
+## 2. Desplegar Parte 3 — OpenTelemetry (HIT #1 + #2)
+
+Esta es la parte central de la sesión actual.
+
+### 2.1 Navegar a la carpeta y ejecutar instalación
 ```bash
+cd otel
+chmod +x install.sh
 ./install.sh
 ```
 
-El script automáticamente:
-- ✅ Crea namespaces `elastic` y `elastic-system`
-- ✅ Instala ECK Operator via Helm
-- ✅ Despliega Elasticsearch (single-node, 8.17.3)
-- ✅ Despliega Kibana (NodePort 30001)
-- ✅ Instala Fluent Bit como DaemonSet
-- ✅ Aplica ILM policy e index templates
+El script `otel/install.sh` realizará lo siguiente:
+- ✅ Crea namespaces `otel` y `otel-operator-system`.
+- ✅ Instala `cert-manager` (requerido por el operador para webhooks TLS).
+- ✅ Instala el **OpenTelemetry Operator** vía Helm.
+- ✅ Configura el **RBAC** para que el collector tenga acceso a metadata de k8s.
+- ✅ Despliega el **OpenTelemetryCollector** como `DaemonSet` (Agente).
+- ✅ **Escala a 0** los agentes viejos (`promtail` y `fluent-bit`) para centralizar todo en OTel.
 
-**Duración esperada**: 3-5 minutos
-
-### 1.3 Verificar que está listo
+### 2.2 Verificar que el Agente está listo
 ```bash
-kubectl -n elastic get pods
-# NAME                                   READY   STATUS    RESTARTS   AGE
-# fluent-bit-xxxxx                       1/1     Running   0          2m
-# scraper-es-default-0                   1/1     Running   0          3m
-# scraper-kb-xxxxxxxx-xxxxx              1/1     Running   0          3m
+kubectl -n otel get pods -l app.kubernetes.io/name=agent-collector
+# Esperado: Pod en estado Running
 ```
-
-### 1.4 Obtener credenciales
-```bash
-NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
-PASSWORD=$(kubectl -n elastic get secret scraper-es-elastic-user -o jsonpath='{.data.elastic}' | base64 -d)
-
-echo "Kibana: https://${NODE_IP}:30001"
-echo "Usuario: elastic"
-echo "Contraseña: $PASSWORD"
-```
-
-### 1.5 Acceder a Kibana
-1. Abrir `https://<NODE_IP>:30001`
-2. Ingresar `elastic` / `$PASSWORD`
-3. Esperar a que cargue completamente (puede tardar 1-2 min)
 
 ---
 
-## 2. Desplegar Scraper Real (TP1/HIT7)
+## 3. Verificación de Hits (End-to-End)
 
-### 2.1 Navegar a manifiestos del scraper
+### 3.1 Desplegar Scraper para generar logs
 ```bash
 cd ../TP1/HIT7/k8s
-```
-
-### 2.2 Crear namespace
-```bash
 kubectl create namespace ml-scraper
-```
-
-### 2.3 Aplicar manifiestos
-```bash
 kubectl apply -n ml-scraper -f .
 ```
 
-Esto crea:
-- ConfigMap con configuración del scraper
-- PersistentVolumeClaim para outputs (1GB)
-- Job `scraper-once` (ejecución inmediata)
-- CronJob `scraper-hourly` (cada hora)
-
-### 2.4 Esperar a que complete el Job
+### 3.2 Crear Job manual y esperar completitud
 ```bash
-kubectl -n ml-scraper wait --for=condition=complete job/scraper-once --timeout=600s
+kubectl -n ml-scraper create job --from=cronjob/scraper-hourly scraper-otel-test-1
+kubectl -n ml-scraper wait --for=condition=complete job/scraper-otel-test-1 --timeout=600s
 ```
 
-Salida esperada:
-```
-job.batch/scraper-once condition met
-```
+### 3.3 Validar HIT #2 (Recolección y Enriquecimiento)
+Verificamos que el OTel Collector esté capturando los logs y añadiendo la metadata de Kubernetes.
 
-### 2.5 Verificar que el scraper ejecutó
 ```bash
-kubectl -n ml-scraper logs job/scraper-once | tail -10
+kubectl -n otel logs ds/agent-collector | Select-String "ml-scraper" -Context 5
 ```
-
-Debería ver líneas como:
-```
-[SUCCESS] JSON guardado: /app/output/bicicleta_rodado_29.json
-[SUCCESS] JSON guardado: /app/output/iphone_16_pro_max.json
-[SUCCESS] JSON guardado: /app/output/geforce_rtx_5090.json
-```
+**Resultado esperado:**
+Deberías ver bloques JSON de logs donde aparezcan atributos como:
+- `k8s.namespace.name: ml-scraper`
+- `k8s.pod.name: scraper-otel-test-1-xxxxx`
+- `k8s.job.name: scraper-otel-test-1`
+- `Body: ...` (contenido del log del scraper)
 
 ---
 
-## 3. Validar P2/HIT2 (Fluent Bit + Elasticsearch)
+## Checklist de Validación Parte 3
 
-### 3.1 Crear nuevo job del scraper
-```bash
-kubectl -n ml-scraper create job --from=cronjob/scraper-hourly scraper-efk-test-1
-```
+### HIT #1 (OTel Operator)
+- [ ] Operador en `Running` en namespace `otel-operator-system`.
+- [ ] CRDs `opentelemetrycollectors` presentes.
+- [ ] `cert-manager` pods en `Running`.
 
-### 3.2 Esperar a que complete
-```bash
-kubectl -n ml-scraper wait --for=condition=complete job/scraper-efk-test-1 --timeout=600s
-```
-
-### 3.3 Verificar que los logs llegaron a Elasticsearch
-```bash
-# Port-forward a Elasticsearch
-kubectl -n elastic port-forward svc/scraper-es-http 9200:9200 &
-sleep 3
-
-# Verificar índices
-PASSWORD=$(kubectl -n elastic get secret scraper-es-elastic-user -o jsonpath='{.data.elastic}' | base64 -d)
-curl -s -u "elastic:$PASSWORD" "http://localhost:9200/_cat/indices?v" | grep scraper
-
-# Output esperado:
-# yellow  open  scraper-logs-2026.05.05  ...  N docs
-```
-
-### 3.4 En Kibana — Stack Management → Index Management
-1. Debería aparecer `scraper-logs-YYYY.MM.DD`
-2. Click en el índice → ver detalles
-
-### 3.5 En Kibana — Discover
-1. Crear un "Data View" para `scraper-logs-*`
-2. Ver los logs parseados con campos:
-   - `level`, `producto`, `logger`, `message`
-   - `kubernetes.namespace`, `kubernetes.pod_name`, `kubernetes.labels.app`
-   - `@timestamp`
-
----
-
-## Checklist de Validación
-
-### HIT #1 (ECK Operator + Elasticsearch + Kibana)
-- [ ] `./install.sh` completa sin errores
-- [ ] `kubectl -n elastic get pods` → todos en `Running`
-- [ ] Kibana accesible en https://<NODE_IP>:30001
-- [ ] Kibana login exitoso con elastic/<password>
-
-### HIT #2 (Fluent Bit DaemonSet)
-- [ ] Fluent Bit pod en `Running`
-- [ ] Fluent Bit logs sin errores (`kubectl -n elastic logs -l app.kubernetes.io/name=fluent-bit`)
-- [ ] Índices `scraper-logs-*` creados en Elasticsearch
-- [ ] Kibana Discover muestra logs del scraper con campos parseados
-
-### Scraper Integration
-- [ ] TP1/HIT7 manifiestos aplicados en namespace `ml-scraper`
-- [ ] `scraper-once` job completó exitosamente
-- [ ] `scraper-hourly` cronjob creado
-- [ ] Logs del scraper aparecen en Elasticsearch cuando se crea un job
-- [ ] En Kibana se ven los logs del scraper en Discover
+### HIT #2 (OTel Collector Agent)
+- [ ] DaemonSet `agent-collector` desplegado en namespace `otel`.
+- [ ] Pods del collector en `Running`.
+- [ ] Logs del collector muestran el procesamiento de archivos en `/var/log/pods/`.
+- [ ] Logs enriquecidos con metadata de K8s (vía `k8sattributes` processor).
 
 ---
 
@@ -181,51 +126,16 @@ curl -s -u "elastic:$PASSWORD" "http://localhost:9200/_cat/indices?v" | grep scr
 
 | Problema | Síntoma | Solución |
 |----------|---------|----------|
-| Kibana no carga | "No se puede cargar la página" | Esperar 1-2 min, recargrar (Ctrl+Shift+R), verificar logs: `kubectl -n elastic logs scraper-kb-*` |
-| Fluent Bit no inicia | Pod en `ContainerCreating` | Verificar `/etc/machine-id` existe en nodo k3d, o recrear pod |
-| Elasticsearch no responde | `curl` timeouts | Verificar `kubectl -n elastic get pods scraper-es-default-0` está `Running`, esperar 2-3 min |
-| Índices no se crean | Elasticsearch tiene 0 docs | Verificar Fluent Bit logs, confirmar que scraper pod tiene label `app=scraper` |
-| Scraper fails | Job en estado `Failed` | Ver logs: `kubectl -n ml-scraper logs job/scraper-once` |
+| OTel Operator falla | Error en webhooks / certs | Verificar que `cert-manager` esté Running y que los CRDs de cert-manager se hayan instalado correctamente. |
+| Collector no ve logs | Atributos k8s vacíos | Revisar RBAC (`kubectl apply -f otel/manifests/rbac.yaml`). El ServiceAccount debe tener permisos de `list/watch` sobre pods y nodes. |
+| CrashLoopBackOff | Error de sintaxis en el YAML | Ver logs: `kubectl -n otel logs ds/agent-collector`. OTel es estricto con la indentación del config. |
 
 ---
 
-## Limpieza Completa (si necesitas empezar de nuevo)
+## Limpieza de Parte 3
 
 ```bash
-# Eliminar todo de P2
-helm uninstall fluent-bit -n elastic 2>/dev/null || true
-helm uninstall eck-operator -n elastic-system 2>/dev/null || true
-kubectl delete ns elastic elastic-system 2>/dev/null || true
-
-# Eliminar scraper
-kubectl delete ns ml-scraper 2>/dev/null || true
-
-# Esperar a que se limpie
-sleep 10
-
-# Reiniciar desde el paso 1
+# Desinstalar OTel
+helm uninstall otel-operator -n otel-operator-system
+kubectl delete ns otel otel-operator-system
 ```
-
----
-
-## Archivos Clave
-
-| Ruta | Descripción |
-|------|-----------|
-| `efk/install.sh` | Script principal que orquesta todo |
-| `efk/helm/fluent-bit-values.yaml` | Config de Fluent Bit (Input → Filter → Output) |
-| `efk/manifests/elasticsearch.yaml` | Config de Elasticsearch single-node |
-| `efk/README.md` | Detalles técnicos de HIT #1 y HIT #2 |
-| `TP1/HIT7/k8s/` | Manifiestos del scraper (configmap, pvc, job, cronjob) |
-| `TP1/HIT7/README.md` | Detalles de deployment del scraper |
-
----
-
-## Duración Total
-
-- **Desplegar EFK**: 3-5 min
-- **Desplegar Scraper**: 5-10 min (el scraper tarda en scrapear)
-- **Verificar en Kibana**: 2-3 min
-
-**Total**: ~15-20 minutos para un flujo completo clean.
-
