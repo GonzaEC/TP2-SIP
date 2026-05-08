@@ -34,7 +34,8 @@ kubectl apply -f "$DIR/manifests/rbac.yaml"
 echo "→ OpenTelemetryCollector CRD"
 kubectl apply -f "$DIR/manifests/collector-agent.yaml"
 # Esperar a que el operator cree el daemonset y los pods estén listos
-kubectl -n "$NAMESPACE" wait --for=condition=ready otelcol/agent --timeout=180s
+sleep 10
+kubectl -n "$NAMESPACE" rollout status ds/agent-collector --timeout=300s
 
 echo ""
 echo "✓ OpenTelemetry Operator running"
