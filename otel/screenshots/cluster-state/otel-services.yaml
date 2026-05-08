@@ -1,0 +1,156 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: "2026-05-08T20:55:33Z"
+    labels:
+      app.kubernetes.io/component: opentelemetry-collector
+      app.kubernetes.io/instance: otel.agent
+      app.kubernetes.io/managed-by: opentelemetry-operator
+      app.kubernetes.io/name: agent-collector
+      app.kubernetes.io/part-of: opentelemetry
+      app.kubernetes.io/version: 0.110.0
+      operator.opentelemetry.io/collector-service-type: base
+    name: agent-collector
+    namespace: otel
+    ownerReferences:
+    - apiVersion: opentelemetry.io/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: OpenTelemetryCollector
+      name: agent
+      uid: 9c245664-9fe5-4c0e-a799-62c6e949372c
+    resourceVersion: "19122"
+    uid: 4d7a3680-b8c9-4915-834d-7b02ba57e309
+  spec:
+    clusterIP: 10.43.246.150
+    clusterIPs:
+    - 10.43.246.150
+    internalTrafficPolicy: Local
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - appProtocol: grpc
+      name: otlp-grpc
+      port: 4317
+      protocol: TCP
+      targetPort: 4317
+    - appProtocol: http
+      name: otlp-http
+      port: 4318
+      protocol: TCP
+      targetPort: 4318
+    selector:
+      app.kubernetes.io/component: opentelemetry-collector
+      app.kubernetes.io/instance: otel.agent
+      app.kubernetes.io/managed-by: opentelemetry-operator
+      app.kubernetes.io/part-of: opentelemetry
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.beta.openshift.io/serving-cert-secret-name: agent-collector-headless-tls
+    creationTimestamp: "2026-05-08T20:55:33Z"
+    labels:
+      app.kubernetes.io/component: opentelemetry-collector
+      app.kubernetes.io/instance: otel.agent
+      app.kubernetes.io/managed-by: opentelemetry-operator
+      app.kubernetes.io/name: agent-collector
+      app.kubernetes.io/part-of: opentelemetry
+      app.kubernetes.io/version: 0.110.0
+      operator.opentelemetry.io/collector-headless-service: Exists
+      operator.opentelemetry.io/collector-service-type: headless
+    name: agent-collector-headless
+    namespace: otel
+    ownerReferences:
+    - apiVersion: opentelemetry.io/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: OpenTelemetryCollector
+      name: agent
+      uid: 9c245664-9fe5-4c0e-a799-62c6e949372c
+    resourceVersion: "19124"
+    uid: 8d2a41d6-f3d3-4e83-842a-1ff2e8b0ef56
+  spec:
+    clusterIP: None
+    clusterIPs:
+    - None
+    internalTrafficPolicy: Local
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - appProtocol: grpc
+      name: otlp-grpc
+      port: 4317
+      protocol: TCP
+      targetPort: 4317
+    - appProtocol: http
+      name: otlp-http
+      port: 4318
+      protocol: TCP
+      targetPort: 4318
+    selector:
+      app.kubernetes.io/component: opentelemetry-collector
+      app.kubernetes.io/instance: otel.agent
+      app.kubernetes.io/managed-by: opentelemetry-operator
+      app.kubernetes.io/part-of: opentelemetry
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: "2026-05-08T20:55:34Z"
+    labels:
+      app.kubernetes.io/component: opentelemetry-collector
+      app.kubernetes.io/instance: otel.agent
+      app.kubernetes.io/managed-by: opentelemetry-operator
+      app.kubernetes.io/name: agent-collector-monitoring
+      app.kubernetes.io/part-of: opentelemetry
+      app.kubernetes.io/version: 0.110.0
+      operator.opentelemetry.io/collector-monitoring-service: Exists
+      operator.opentelemetry.io/collector-service-type: monitoring
+    name: agent-collector-monitoring
+    namespace: otel
+    ownerReferences:
+    - apiVersion: opentelemetry.io/v1beta1
+      blockOwnerDeletion: true
+      controller: true
+      kind: OpenTelemetryCollector
+      name: agent
+      uid: 9c245664-9fe5-4c0e-a799-62c6e949372c
+    resourceVersion: "19126"
+    uid: b3ff02c8-4eba-43d0-9ba7-66ac64e434f6
+  spec:
+    clusterIP: 10.43.138.209
+    clusterIPs:
+    - 10.43.138.209
+    internalTrafficPolicy: Cluster
+    ipFamilies:
+    - IPv4
+    ipFamilyPolicy: SingleStack
+    ports:
+    - name: monitoring
+      port: 8888
+      protocol: TCP
+      targetPort: 8888
+    selector:
+      app.kubernetes.io/component: opentelemetry-collector
+      app.kubernetes.io/instance: otel.agent
+      app.kubernetes.io/managed-by: opentelemetry-operator
+      app.kubernetes.io/part-of: opentelemetry
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+kind: List
+metadata:
+  resourceVersion: ""

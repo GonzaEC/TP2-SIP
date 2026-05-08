@@ -49,9 +49,15 @@ spec:
               mountPath: /app/output
             - name: screenshots
               mountPath: /app/screenshots
+            - name: dshm
+              mountPath: /dev/shm
       volumes:
         - name: output
           persistentVolumeClaim:
             claimName: scraper-output
         - name: screenshots
           emptyDir: {}
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 512Mi

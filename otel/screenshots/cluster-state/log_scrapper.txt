@@ -1,0 +1,28 @@
+$ kubectl logs -n ml-scraper -l job-name=scraper-sdk-test-3 -f
+Defaulted container "scraper" out of: scraper, wait-for-postgres (init)
+[entrypoint] Browser: chrome | Headless: true
+{"timestamp":"2026-05-08T21:46:06.092746303Z","message":"Browser: chrome | Headless: true","logger":"ar.edu.sip.BrowserFactory","thread":"main","level":"INFO"}
+
+Exception in thread "main" org.openqa.selenium.SessionNotCreatedException: Could not start a new session. Response code 500. Message: session not created: DevToolsActivePort file doesn't exist 
+Host info: host: 'scraper-sdk-test-3-7bhlm', ip: '10.42.0.82'
+Build info: version: '4.20.0', revision: '866c76ca80'
+System info: os.name: 'Linux', os.arch: 'amd64', os.version: '7.0.3-arch1-2', java.version: '17.0.11'
+Driver info: org.openqa.selenium.chrome.ChromeDriver
+Command: [null, newSession {capabilities=[Capabilities {browserName: chrome, goog:chromeOptions: {args: [--disable-blink-features=Au..., --user-agent=Mozilla/5.0 (X..., --disable-gpu, --disable-software-rasterizer, --disable-extensions, --disable-background-networ..., --disable-default-apps, --no-first-run, --window-size=1920,1080, --headless=new, --no-sandbox, --disable-dev-shm-usage], binary: /usr/bin/google-chrome, excludeSwitches: [enable-automation], extensions: []}}]}]
+        at org.openqa.selenium.remote.ProtocolHandshake.createSession(ProtocolHandshake.java:114)
+        at org.openqa.selenium.remote.ProtocolHandshake.createSession(ProtocolHandshake.java:75)
+        at org.openqa.selenium.remote.ProtocolHandshake.createSession(ProtocolHandshake.java:61)
+        at org.openqa.selenium.remote.HttpCommandExecutor.execute(HttpCommandExecutor.java:162)
+        at org.openqa.selenium.remote.service.DriverCommandExecutor.invokeExecute(DriverCommandExecutor.java:216)
+        at org.openqa.selenium.remote.service.DriverCommandExecutor.execute(DriverCommandExecutor.java:174)
+        at org.openqa.selenium.remote.RemoteWebDriver.execute(RemoteWebDriver.java:518)
+        at org.openqa.selenium.remote.RemoteWebDriver.startSession(RemoteWebDriver.java:232)
+        at org.openqa.selenium.remote.RemoteWebDriver.<init>(RemoteWebDriver.java:161)
+        at org.openqa.selenium.chromium.ChromiumDriver.<init>(ChromiumDriver.java:114)
+        at org.openqa.selenium.chrome.ChromeDriver.<init>(ChromeDriver.java:88)
+        at org.openqa.selenium.chrome.ChromeDriver.<init>(ChromeDriver.java:83)
+        at org.openqa.selenium.chrome.ChromeDriver.<init>(ChromeDriver.java:72)
+        at ar.edu.sip.BrowserFactory.buildChrome(BrowserFactory.java:101)
+        at ar.edu.sip.BrowserFactory.create(BrowserFactory.java:33)
+        at ar.edu.sip.MercadoLibreScraper.main(MercadoLibreScraper.java:72)
+Este error (DevToolsActivePort file doesn't exist) es un problema de Chrome/Selenium sin relación con OTel — probablemente memoria o /dev/shm insuficiente en el pod.

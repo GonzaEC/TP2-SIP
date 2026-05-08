@@ -19,12 +19,11 @@ spec:
           containers:
             - name: elasticsearch
               env:
-                # Heap fijo: 1 GB (50% del limit de 2 GiB — regla de Elastic para JVM).
                 - name: ES_JAVA_OPTS
-                  value: "-Xms1g -Xmx1g"
+                  value: "-Xms768m -Xmx768m"
               resources:
-                requests: { cpu: 500m,  memory: 1Gi }
-                limits:   { cpu: 1000m, memory: 2Gi }
+                requests: { cpu: 500m,  memory: 1536Mi }
+                limits:   { cpu: 1000m, memory: 1536Mi }
       volumeClaimTemplates:
         - metadata:
             name: elasticsearch-data

@@ -1,0 +1,46 @@
+2026-05-08T20:57:27.586Z	info	service@v0.110.0/service.go:137	Setting up own telemetry...
+2026-05-08T20:57:27.685Z	info	service@v0.110.0/service.go:186	Skipped telemetry setup.
+2026-05-08T20:57:27.687Z	info	service@v0.110.0/service.go:208	Starting otelcol-contrib...	{"Version": "0.110.0", "NumCPU": 12}
+2026-05-08T20:57:27.687Z	info	extensions/extensions.go:39	Starting extensions...
+2026-05-08T20:57:27.856Z	info	kube/client.go:123	k8s filtering	{"kind": "processor", "name": "k8sattributes", "pipeline": "logs", "labelSelector": "", "fieldSelector": ""}
+2026-05-08T20:57:27.856Z	info	adapter/receiver.go:47	Starting stanza receiver	{"kind": "receiver", "name": "filelog", "data_type": "logs"}
+2026-05-08T20:57:28.584Z	warn	internal@v0.110.0/warning.go:40	Using the 0.0.0.0 address exposes this server to every network interface, which may facilitate Denial of Service attacks.	{"kind": "receiver", "name": "otlp", "data_type": "logs", "documentation": "https://github.com/open-telemetry/opentelemetry-collector/blob/main/docs/security-best-practices.md#safeguards-against-denial-of-service-attacks"}
+2026-05-08T20:57:29.018Z	info	otlpreceiver@v0.110.0/otlp.go:112	Starting GRPC server	{"kind": "receiver", "name": "otlp", "data_type": "logs", "endpoint": "0.0.0.0:4317"}
+2026-05-08T20:57:29.018Z	warn	internal@v0.110.0/warning.go:40	Using the 0.0.0.0 address exposes this server to every network interface, which may facilitate Denial of Service attacks.	{"kind": "receiver", "name": "otlp", "data_type": "logs", "documentation": "https://github.com/open-telemetry/opentelemetry-collector/blob/main/docs/security-best-practices.md#safeguards-against-denial-of-service-attacks"}
+2026-05-08T20:57:29.018Z	info	otlpreceiver@v0.110.0/otlp.go:169	Starting HTTP server	{"kind": "receiver", "name": "otlp", "data_type": "logs", "endpoint": "0.0.0.0:4318"}
+2026-05-08T20:57:29.018Z	info	service@v0.110.0/service.go:234	Everything is ready. Begin running and processing data.
+2026-05-08T20:57:29.689Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_postgres-0_a2bd240b-c0e9-4c7d-be58-c18f54f5241c/postgres/0.log"}
+2026-05-08T20:57:30.615Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-hourly-29637780-tw8gm_0bfb909d-da4e-496d-8d01-0d2df28106dd/scraper/0.log"}
+2026-05-08T20:57:30.615Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-hourly-29637780-tw8gm_0bfb909d-da4e-496d-8d01-0d2df28106dd/wait-for-postgres/0.log"}
+2026-05-08T20:57:31.176Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-hourly-29637840-q2ts7_c06ff3ec-4829-415f-afc9-99417017deeb/scraper/0.log"}
+2026-05-08T20:57:31.176Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-hourly-29637840-q2ts7_c06ff3ec-4829-415f-afc9-99417017deeb/wait-for-postgres/0.log"}
+2026-05-08T20:57:31.452Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-sdk-test-1-zlrz6_8198ed30-a840-4d84-830a-acaa58e80ba5/scraper/0.log"}
+2026-05-08T20:57:31.452Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-sdk-test-1-zlrz6_8198ed30-a840-4d84-830a-acaa58e80ba5/wait-for-postgres/0.log"}
+2026-05-08T21:01:29.237Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-hourly-29637900-q6bm2_9e5c7c76-f7f0-4b73-9591-08b57df22910/wait-for-postgres/0.log"}
+2026-05-08T21:02:38.037Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-hourly-29637900-q6bm2_9e5c7c76-f7f0-4b73-9591-08b57df22910/scraper/0.log"}
+2026-05-08T21:32:47.037Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-sdk-test-2-bn95x_41f3c481-59eb-41fb-b236-0fb2e280f8c6/wait-for-postgres/0.log"}
+2026-05-08T21:33:02.837Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-sdk-test-2-bn95x_41f3c481-59eb-41fb-b236-0fb2e280f8c6/scraper/0.log"}
+2026-05-08T21:39:27.637Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-sdk-test-2-bn95x_41f3c481-59eb-41fb-b236-0fb2e280f8c6/scraper/1.log"}
+2026-05-08T21:43:42.637Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-sdk-test-3-7bhlm_0b7a91f1-8151-46db-a746-655835ebf21e/wait-for-postgres/0.log"}
+2026-05-08T21:44:44.037Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-sdk-test-3-7bhlm_0b7a91f1-8151-46db-a746-655835ebf21e/scraper/0.log"}
+2026-05-08T21:47:53.237Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-sdk-test-2-bn95x_41f3c481-59eb-41fb-b236-0fb2e280f8c6/scraper/2.log"}
+2026-05-08T21:50:32.897Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-sdk-test-3-7bhlm_0b7a91f1-8151-46db-a746-655835ebf21e/scraper/1.log"}
+2026-05-08T21:55:01.009Z	error	elasticsearchexporter@v0.110.0/bulkindexer.go:329	bulk indexer flush error	{"kind": "exporter", "data_type": "logs", "name": "elasticsearch", "error": "failed to execute the request: context deadline exceeded"}
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter.flushBulkIndexer
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter@v0.110.0/bulkindexer.go:329
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter.(*asyncBulkIndexerWorker).flush
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter@v0.110.0/bulkindexer.go:312
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter.(*asyncBulkIndexerWorker).run
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter@v0.110.0/bulkindexer.go:305
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter.newAsyncBulkIndexer.func1
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter@v0.110.0/bulkindexer.go:202
+2026-05-08T21:55:00.593Z	error	elasticsearchexporter@v0.110.0/bulkindexer.go:329	bulk indexer flush error	{"kind": "exporter", "data_type": "logs", "name": "elasticsearch", "error": "failed to execute the request: context deadline exceeded"}
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter.flushBulkIndexer
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter@v0.110.0/bulkindexer.go:329
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter.(*asyncBulkIndexerWorker).flush
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter@v0.110.0/bulkindexer.go:312
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter.(*asyncBulkIndexerWorker).run
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter@v0.110.0/bulkindexer.go:305
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter.newAsyncBulkIndexer.func1
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter@v0.110.0/bulkindexer.go:202
+2026-05-08T21:58:12.838Z	info	fileconsumer/file.go:256	Started watching file	{"kind": "receiver", "name": "filelog", "data_type": "logs", "component": "fileconsumer", "path": "/var/log/pods/ml-scraper_scraper-sdk-test-3-7bhlm_0b7a91f1-8151-46db-a746-655835ebf21e/scraper/2.log"}
