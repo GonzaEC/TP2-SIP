@@ -1,10 +1,11 @@
 ---
-# job.yaml
-# Ejecuta el scraper una sola vez. Conecta a PostgreSQL via ConfigMap + Secret.
+# job.yaml — HIT 5: versión one-shot para verificar que OTel funciona
+# Igual que el CronJob pero name: scraper-sdk-test-1 para identificarlo en Loki.
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: scraper-once
+  name: scraper-sdk-test-1
+  namespace: ml-scraper
 spec:
   backoffLimit: 2
   template:
@@ -26,17 +27,23 @@ spec:
               echo "PostgreSQL listo."
       containers:
         - name: scraper
-          image: ml-scraper:hit3
+          image: ml-scraper:otel-v1
           imagePullPolicy: IfNotPresent
-          envFrom:
-            - configMapRef:
-                name: scraper-config
           env:
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: postgres-secret
                   key: POSTGRES_PASSWORD
+          envFrom:
+            - configMapRef:
+                name: scraper-config
+            - configMapRef:
+                name: otel-collector-endpoint
           volumeMounts:
             - name: output
               mountPath: /app/output
