@@ -32,7 +32,7 @@ spec:
                   echo "PostgreSQL listo."
           containers:
             - name: scraper
-              image: ml-scraper:hit3
+              image: ml-scraper:hit3 #editar esta linea para usar el scraper remoto
               imagePullPolicy: IfNotPresent
               envFrom:
                 - configMapRef:
