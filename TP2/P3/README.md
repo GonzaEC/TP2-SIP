@@ -6,7 +6,7 @@ Este módulo centraliza la recolección de telemetría (logs, traces) utilizando
 
 - [HIT 1: Deploy del OpenTelemetry Operator](./HIT1/README.md)
 - [HIT 2: OpenTelemetryCollector en modo Agent (DaemonSet)](./HIT2/README.md)
-- HIT 3: Fan-out simultáneo a Loki + Elasticsearch (Pendiente)
+- [HIT 3: Fan-out simultáneo a Loki + Elasticsearch ✅](./HIT3/README.md)
 - HIT 4: Reemplazo de agentes legacy (Pendiente)
 - HIT 5: Instrumentación del scraper con SDK (Pendiente)
 - HIT 6: Bonus: Traces (Pendiente)

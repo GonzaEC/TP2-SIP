@@ -16,6 +16,14 @@ spec:
     - effect: NoSchedule
       operator: Exists
 
+  # === HIT 3: credencial de Elastic inyectada desde secret ===
+  env:
+    - name: ELASTIC_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: elastic-credentials
+          key: password
+
   # Mountamos /var/log y /var/lib/docker/containers para que filelog pueda leer
   volumeMounts:
     - name: varlog
@@ -92,19 +100,45 @@ spec:
             from_attribute: app
             action: insert
 
+      # === HIT 3: inyectar log_id único por cada log record ===
+      # El processor "attributes" no puede generar UUIDs, se usa OTTL via transform.
+      transform:
+        log_statements:
+          - context: log
+            statements:
+              - 'set(attributes["log_id"], UUID()) where attributes["log_id"] == nil'
+
     exporters:
-      # En este Hit solo debug. Hit #3 agrega loki + elasticsearch.
+      # Verbosity reducida — el pipeline ya se validó en Hit #2
       debug:
-        verbosity: detailed
-        sampling_initial: 5
-        sampling_thereafter: 200
+        verbosity: basic
+
+      # === HIT 3 — Backend #1: Loki via OTLP nativo ===
+      # Loki ≥ 3.0 acepta OTLP en el endpoint /otlp.
+      # Este exporter (otlphttp/loki) reemplaza al "loki" legacy, que está
+      # deprecado en 0.110+ y tiene problemas de cardinality con labels dinámicos.
+      otlphttp/loki:
+        endpoint: http://loki.observability.svc.cluster.local:3100/otlp
+
+      # === HIT 3 — Backend #2: Elasticsearch ===
+      # La password se toma del env var inyectado desde el secret elastic-credentials.
+      elasticsearch:
+        endpoints:
+          - https://scraper-es-http.elastic.svc.cluster.local:9200
+        user: elastic
+        password: ${env:ELASTIC_PASSWORD}
+        tls:
+          insecure_skip_verify: true   # cert self-signed del ECK operator (scraper-es-http)
+        logs_index: scraper-logs
+        mapping:
+          mode: ecs                    # campo "level" como keyword, no text
 
     service:
       pipelines:
         logs:
-          receivers: [filelog, otlp]
-          processors: [k8sattributes, attributes, batch]
-          exporters: [debug]
+          receivers:  [filelog, otlp]
+          processors: [k8sattributes, attributes, transform, batch]
+          exporters:  [otlphttp/loki, elasticsearch]
       telemetry:
         logs:
           level: info
