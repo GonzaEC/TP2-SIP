@@ -10,8 +10,8 @@ Workload generador de logs: `ml-scraper` (CronJob `scraper-hourly`)
 
 | Métrica | Loki + Promtail + Grafana | EFK (ES + Fluent Bit + Kibana) | OTel Collector |
 |---|---|---|---|
-| RAM total (MiB) | 324 | 2142 | 84 |
-| CPU total (mCPU) | 30 | 81 | 7 |
+| RAM total (MiB)   | 369 ± 22  | 2171 ± 31 | 90 ± 4  |
+| CPU total (mCPU)  | 35 ± 10   | 84 ± 27   | 9 ± 2   |
 | Disco PVC tras 24 h (MiB) | - | - | passthrough (0) |
 | Query latency p50 (ms) | - | - | - |
 | Query latency p95 (ms) | - | - | - |
@@ -41,23 +41,32 @@ kubectl top pods -n otel --no-headers | awk '{cpu+=$2; mem+=$3} END {print "OTel
 |Muestra 2 (+1h)|||
 |---|---|---|             
 | ***Stack*** | ***CPU (mCPU)***| ***RAM (MiB)*** |
-| Loki + Promtail + Grafana |  |  |
-| EFK (ES + Fluent Bit + Kibana) |  |  |
-| OTel Collector |  |  |
+| Loki + Promtail + Grafana | 30 | 385 |
+| EFK (ES + Fluent Bit + Kibana) | 61  | 2182 |
+| OTel Collector | 8 | 85 |
 
 |Muestra 3 (+2h)|||
 |---|---|---|             
 | ***Stack*** | ***CPU (mCPU)***| ***RAM (MiB)*** |
-| Loki + Promtail + Grafana |  |  |
-| EFK (ES + Fluent Bit + Kibana) |  |  |
-| OTel Collector |  |  |
+| Loki + Promtail + Grafana | 47 | 378 |
+| EFK (ES + Fluent Bit + Kibana) | 78 | 2136 |
+| OTel Collector | 11 | 93 |
 
-|Media y desviación estándar|||
-|---|---|---|             
-| ***Stack*** | ***CPU (mCPU)***| ***RAM (MiB)*** |
-| Loki + Promtail + Grafana |  |  |
-| EFK (ES + Fluent Bit + Kibana) |  |  |
-| OTel Collector |  |  |
+---
+
+### **Media y desviación estándar**
+
+**Loki + Promtail + Grafana**
+* CPU: muestras 29, 30, 47 → media: 35.3m | desv: 9.9m
+* RAM: muestras 344, 385, 378 → media: 369 MiB | desv: 22.0 MiB
+
+**EFK (ES + Fluent Bit + Kibana)**
+* CPU: muestras 113, 61, 78 → media: 84.0m | desv: 26.6m
+* RAM: muestras 2194, 2182, 2136 → media: 2170.7 MiB | desv: 30.5 MiB
+
+**OTel Collector**
+* CPU: muestras 9, 8, 11 → media: 9.3m | desv: 1.5m
+* RAM: muestras 92, 85, 93 → media: 90.0 MiB | desv: 4.4 MiB
 
 ---
 
