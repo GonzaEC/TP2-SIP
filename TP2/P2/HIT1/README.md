@@ -26,8 +26,9 @@ Se eligió el modo **single-node** debido a las restricciones de RAM de un clust
 Configuración clave:
 - `node.store.allow_mmap: false` — necesario en k3s local-path.
 - `ES_JAVA_OPTS: "-Xms1g -Xmx1g"` — heap fijo de 1GB (50% del limit de 2GB).
-- `index.number_of_replicas: 0` — ineludible en single-node para que el status sea `green`.
 - Resources: 1Gi-2Gi RAM, 500m-1000m CPU.
+
+> **Importante**: `number_of_replicas: 0` **no** va en el bloque de configuración del nodo — ES 8.x lo rechaza con `IllegalArgumentException`. Se fija en el **index template** vía API (ver Hit #3). Adicionalmente, `install.sh` aplica `PUT /_all/_settings {"index.number_of_replicas":"0"}` para forzar réplicas=0 en los índices internos de Kibana (que los crean con réplicas=1 hardcoded), evitando que el cluster quede en estado `yellow`.
 
 ### 3. Kibana (Custom Resource)
 
@@ -87,3 +88,7 @@ Al abrir Kibana, el status del cluster debe reportar 1 nodo conectado y saludabl
 | `efk/manifests/kibana.yaml` | CR de la UI Kibana |
 | `efk/manifests/kibana-nodeport.yaml` | Servicio de acceso externo |
 | `efk/install.sh` | Script automatizado |
+
+## Captura de validación
+
+![HIT1 - Elasticsearch y Kibana green](/efk/screenshots/Hit1-Output.png)

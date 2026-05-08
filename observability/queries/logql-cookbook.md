@@ -40,7 +40,7 @@ sum by (producto) (
 ```
 **3. Output esperado:**
 
-![alt text](/observability/screenshots/hit3-image.jpg)
+![Q2 - Tasa de WARNINGs por minuto](/observability/screenshots/hit4-image.jpg)
 
 - **Eje X:** Muestra la línea de tiempo de la última hora (desde las 10:00 AM hasta las 11:00 AM).
 - **Eje Y:** Representa las "Operaciones por segundo" promediadas por minuto.

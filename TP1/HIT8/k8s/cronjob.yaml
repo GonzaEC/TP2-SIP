@@ -1,10 +1,15 @@
 ---
-# cronjob.yaml
-# Ejecuta el scraper cada hora. Conecta a PostgreSQL acumulando histórico.
+# cronjob.yaml — TP2 - PARTE 3 - HIT 5: agrega NODE_IP + envFrom otel-collector-endpoint
+# Diferencia respecto al TP 1 - HIT 8:
+#   + env NODE_IP (fieldRef status.hostIP) para que el ConfigMap pueda
+#     expandir $(NODE_IP) en OTEL_EXPORTER_OTLP_ENDPOINT.
+#   + envFrom otel-collector-endpoint: inyecta las variables OTel al container.
+#   + imagen actualizada a ml-scraper:otel-v1
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: scraper-hourly
+  namespace: ml-scraper
 spec:
   schedule: "0 * * * *"
   concurrencyPolicy: Forbid
@@ -32,17 +37,27 @@ spec:
                   echo "PostgreSQL listo."
           containers:
             - name: scraper
-              image: ml-scraper:hit3 #editar esta linea para usar el scraper remoto
+              image: ml-scraper:otel-v1      # <-- imagen nueva con OTel
               imagePullPolicy: IfNotPresent
-              envFrom:
-                - configMapRef:
-                    name: scraper-config
               env:
+                # NODE_IP: IP del nodo donde corre este Pod.
+                # Usado por el ConfigMap para expandir OTEL_EXPORTER_OTLP_ENDPOINT.
+                - name: NODE_IP
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.hostIP
                 - name: POSTGRES_PASSWORD
                   valueFrom:
                     secretKeyRef:
                       name: postgres-secret
                       key: POSTGRES_PASSWORD
+              envFrom:
+                # Config base del scraper (BROWSER, HEADLESS, PRODUCTS, etc.)
+                - configMapRef:
+                    name: scraper-config
+                # Variables OTel (OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_SERVICE_NAME, etc.)
+                - configMapRef:
+                    name: otel-collector-endpoint
               volumeMounts:
                 - name: output
                   mountPath: /app/output

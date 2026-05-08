@@ -1,13 +1,20 @@
+<!-- logback.xml — src/main/resources/logback.xml -->
+<!--
+  TP2 -PARTE 3- HIT 5: 2 appenders en paralelo.
+    - CONSOLE → JSON a stdout via LogstashEncoder (Loki vía filelog, igual que antes)
+    - OTEL    → bridge al SDK OTel, envía por gRPC al collector DaemonSet
+  Los call-sites LOG.info/warn/error no se modifican.
+-->
 <configuration>
 
-  <!--
-    CONSOLE → JSON line-delimited via LogstashEncoder
-    Este appender es el que lee Promtail desde /var/log/pods/...
-    Cada línea es un objeto JSON con todos los campos del MDC extraíbles con | json en LogQL.
-  -->
+  <!-- ── Appender 1: JSON a stdout ─────────────────────────────────────── -->
   <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
     <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-      <!-- Renombrar campos para que coincidan con lo que espera el Hit #4 -->
+
+      <!--
+        Renombrar campos al nivel que espera Loki/Kibana.
+        [ignore] = omitir ese campo del JSON de salida.
+      -->
       <fieldNames>
         <timestamp>timestamp</timestamp>
         <version>[ignore]</version>
@@ -18,33 +25,37 @@
         <message>message</message>
         <stackTrace>stack_trace</stackTrace>
       </fieldNames>
-      <!-- Incluir los campos MDC como campos JSON de primer nivel -->
+
+      <!--
+        Incluir claves MDC como campos JSON de primer nivel.
+        LogstashEncoder incluye TODO el MDC por defecto, pero listándolas
+        explícitamente se documenta qué campos espera el pipeline.
+      -->
       <includeMdcKeyName>producto</includeMdcKeyName>
       <includeMdcKeyName>browser</includeMdcKeyName>
       <includeMdcKeyName>intento</includeMdcKeyName>
+
     </encoder>
   </appender>
 
+  <!-- ── Appender 2: Bridge Logback → OTel SDK (HIT 5) ────────────────── -->
   <!--
-    FILE → texto plano rotativo para debugging local.
-    Este appender NO va a Loki — solo sirve dentro del pod o montado en un PVC.
+    Captura los mismos eventos que CONSOLE y los reenvía al LoggerProvider
+    inicializado en OtelSetup.init().
+    captureExperimentalAttributes=true → agrega campos como thread.name, etc.
+    captureMdcAttributes → los mismos campos MDC llegan como atributos OTel,
+    por eso aparecen como labels filtrables en Loki y campos en Kibana.
   -->
-  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-    <file>logs/scraper.log</file>
-    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-      <fileNamePattern>logs/scraper.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-      <maxFileSize>2MB</maxFileSize>
-      <maxHistory>3</maxHistory>
-      <totalSizeCap>10MB</totalSizeCap>
-    </rollingPolicy>
-    <encoder>
-      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%logger{20}] %msg%n</pattern>
-    </encoder>
+  <appender name="OTEL"
+            class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+    <captureExperimentalAttributes>true</captureExperimentalAttributes>
+    <captureMdcAttributes>producto,browser,intento</captureMdcAttributes>
   </appender>
 
+  <!-- ── Root logger: los dos appenders activos ────────────────────────── -->
   <root level="INFO">
     <appender-ref ref="CONSOLE"/>
-    <appender-ref ref="FILE"/>
+    <appender-ref ref="OTEL"/>
   </root>
 
 </configuration>

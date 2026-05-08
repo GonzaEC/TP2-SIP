@@ -4,6 +4,11 @@ import static net.logstash.logback.argument.StructuredArguments.kv;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,17 +27,11 @@ import org.slf4j.MDC;
 
 /**
  * Scraper de MercadoLibre con paginación (hasta 3 páginas / 30 resultados) y persistencia en
- * PostgreSQL.
- *
- * <p>Hit #3: emite logs JSON line-delimited a stdout via LogstashEncoder. Campos estructurados
- * disponibles en Loki con {@code | json | producto="iphone"} o {@code | json | level="ERROR"}.
- *
- * <p>Estrategia de campos:
- *
- * <ul>
- *   <li>MDC.put() → campos que aplican a un bloque de líneas (producto, browser, intento).
- *   <li>kv() como argumento → campos puntuales de un evento (items_found, duration_ms, page).
- * </ul>
+ * PostgreSQL. TP2 -PARTE 3 -HIT 5: emite logs via OTLP/gRPC al collector DaemonSet (además de JSON
+ * a stdout). No se modifican los call-sites LOG.info/warn/error — el bridge Logback -> OTel lo hace
+ * automaticamente via OpenTelemetryAppender en logback.xml + OtelSetup.init(). HIT 6 (Bonus): cada
+ * producto se envuelve en un span de tracing. Los logs emitidos dentro del span heredan su trace_id
+ * y span_id, permitiendo correlación log <-> trace en Loki/Kibana/Jaeger.
  */
 public class MercadoLibreScraper {
 
@@ -42,13 +41,8 @@ public class MercadoLibreScraper {
   private static final int TIMEOUT_SEG = 30;
   private static final int MAX_REINTENTOS = 3;
 
-  /** Total de resultados a recolectar por producto (navegando hasta MAX_PAGINAS). */
   static final int CANT_RESULTADOS = 30;
-
-  /** Límite de ítems extraídos por página. */
   static final int CANT_POR_PAGINA = 10;
-
-  /** Máximo de páginas a recorrer. */
   static final int MAX_PAGINAS = 3;
 
   static final String[] PRODUCTOS_DEFAULT = {
@@ -64,22 +58,48 @@ public class MercadoLibreScraper {
   }
 
   public static void main(String[] args) throws IOException {
+    // TP2 - PARTE 3 - HIT 5: inicializar OTel SDK antes de cualquier log.
+    // Registra el shutdown hook que vacía el buffer BatchLogRecordProcessor
+    // antes de que el JVM termine (crítico en Jobs de corta duración).
+    OpenTelemetry otel = OtelSetup.init();
+
+    // TP2 - PARTE 3 - HIT 6: Tracer para crear spans por producto.
+    Tracer tracer = otel.getTracer("ar.edu.sip.scraper", "1.0");
+
     String browser = BrowserFactory.resolveName(null);
     boolean headless = BrowserFactory.resolveHeadless();
     String[] productos = resolveProductos();
     WebDriver driver = BrowserFactory.create(browser, headless);
     WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TIMEOUT_SEG));
 
-    // browser en MDC global: aparece en todos los logs de esta ejecución
     MDC.put("browser", browser);
     LOG.info("MercadoLibre Scraper iniciado");
 
     try {
       for (String producto : productos) {
-        // producto en MDC: aparece en cada log dentro del bloque de este producto
         MDC.put("producto", producto);
         LOG.info("Iniciando scrape");
-        ejecutarConReintentos(driver, wait, producto, browser);
+
+        // HIT 6: span que envuelve todo el proceso de un producto.
+        // Los logs emitidos dentro del scope heredan el trace_id de este span.
+        // En Loki: {service="scraper"} | json | trace_id != ""
+        Span span =
+            tracer
+                .spanBuilder("scrape.producto")
+                .setAttribute("producto", producto)
+                .setAttribute("browser", browser)
+                .startSpan();
+
+        try (Scope ignored = span.makeCurrent()) {
+          ejecutarConReintentos(driver, wait, producto, browser);
+        } catch (Exception e) {
+          span.setStatus(StatusCode.ERROR, e.getMessage());
+          span.recordException(e);
+          throw e;
+        } finally {
+          span.end();
+        }
+
         MDC.remove("producto");
       }
     } finally {
@@ -89,12 +109,12 @@ public class MercadoLibreScraper {
     System.exit(0);
   }
 
+  // ── Métodos sin cambios respecto al HIT 8 original ───────────────────────
+
   static void ejecutarConReintentos(
       WebDriver driver, WebDriverWait wait, String producto, String browser) {
     int intento = 1;
-
     while (intento <= MAX_REINTENTOS) {
-      // intento en MDC: permite filtrar en Loki con | json | intento="2"
       MDC.put("intento", String.valueOf(intento));
       try {
         procesarProducto(driver, wait, producto, browser);
@@ -117,46 +137,30 @@ public class MercadoLibreScraper {
       WebDriver driver, WebDriverWait wait, String producto, String browser) throws IOException {
     Instant inicio = Instant.now();
     driver.get(URL_BASE);
-
     WebElement campo =
         wait.until(ExpectedConditions.elementToBeClickable(Selectors.INPUT_BUSQUEDA));
-
     campo.clear();
     campo.sendKeys(producto, Keys.ENTER);
-
     esperarResultados(driver, wait, producto);
     cerrarBannerCookies(driver);
-
     aplicarFiltro(driver, wait, "Nuevo", producto);
     aplicarFiltro(driver, wait, "Solo tiendas oficiales", producto);
     aplicarOrden(driver, wait, "relevantes", producto);
-
     List<ProductResult> resultados = extraerDatosConPaginacion(driver, wait, producto);
-
     PriceStats stats = PriceStats.calcular(resultados);
     stats.imprimirResumen(producto);
-
     long duracionMs = Duration.between(inicio, Instant.now()).toMillis();
-
-    // Mensaje exacto "Scrape completado" — usado por la query Q5 del Hit #4
-    // kv() convierte items_found y duration_ms en campos JSON extraíbles con | json
     LOG.info(
         "Scrape completado", kv("items_found", resultados.size()), kv("duration_ms", duracionMs));
-
     guardarJson(producto, resultados);
     PostgresWriter.guardar(producto, resultados, stats);
     tomarScreenshot(driver, producto, browser);
   }
 
-  /**
-   * Navega hasta MAX_PAGINAS recolectando CANT_POR_PAGINA ítems por página hasta alcanzar
-   * CANT_RESULTADOS en total.
-   */
   static List<ProductResult> extraerDatosConPaginacion(
       WebDriver driver, WebDriverWait wait, String producto) {
     List<ProductResult> todos = new ArrayList<>();
     int pagina = 1;
-
     while (pagina <= MAX_PAGINAS && todos.size() < CANT_RESULTADOS) {
       List<ProductResult> paginaActual = extraerDatos(driver, producto);
       todos.addAll(paginaActual);
@@ -166,21 +170,16 @@ public class MercadoLibreScraper {
           kv("items_pagina", paginaActual.size()),
           kv("items_acumulados", todos.size()),
           kv("items_objetivo", CANT_RESULTADOS));
-
       if (todos.size() >= CANT_RESULTADOS || !irSiguientePagina(driver, wait)) {
         break;
       }
       pagina++;
     }
-
     return todos.size() > CANT_RESULTADOS
         ? new ArrayList<>(todos.subList(0, CANT_RESULTADOS))
         : todos;
   }
 
-  /**
-   * Hace click en "Siguiente" y espera que carguen los nuevos resultados. Retorna false si no hay.
-   */
   static boolean irSiguientePagina(WebDriver driver, WebDriverWait wait) {
     try {
       WebElement sig = driver.findElement(Selectors.BOTON_SIGUIENTE_PAGINA);
@@ -195,36 +194,24 @@ public class MercadoLibreScraper {
     }
   }
 
-  /** Extrae hasta CANT_POR_PAGINA ítems de la página actual. */
   public static List<ProductResult> extraerDatos(WebDriver driver, String producto) {
     List<ProductResult> lista = new ArrayList<>();
-
     List<WebElement> contenedores = driver.findElements(Selectors.CONTENEDOR_RESULTADOS);
-
     int limite = Math.min(CANT_POR_PAGINA, contenedores.size());
-
     for (int i = 0; i < limite; i++) {
       WebElement c = contenedores.get(i);
       ProductResult pr = new ProductResult();
-
       try {
         WebElement linkElem = c.findElement(Selectors.PRODUCT_LINK);
-
         pr.setTitulo(linkElem.getText().trim());
         pr.setLink(linkElem.getAttribute("href"));
-
         pr.setPrecio(tryGetLong(c, Selectors.PRODUCT_PRICE));
         pr.setTiendaOficial(tryGetText(c, Selectors.PRODUCT_OFFICIAL_STORE, "por "));
-
         String envio = tryGetText(c, Selectors.PRODUCT_SHIPPING, "");
-
         pr.setEnvioGratis(envio != null && envio.toLowerCase().contains("gratis"));
-
         String cuotas = tryGetText(c, Selectors.PRODUCT_INSTALLMENTS, "");
-
         pr.setCuotasSinInteres(
             cuotas != null && cuotas.toLowerCase().contains("sin interés") ? cuotas : null);
-
         lista.add(pr);
       } catch (Exception e) {
         LOG.warn("Error parcial en item", kv("item_index", i + 1), kv("error_msg", e.getMessage()));
@@ -236,11 +223,9 @@ public class MercadoLibreScraper {
   static String tryGetText(WebElement parent, By selector, String removePrefix) {
     try {
       String text = parent.findElement(selector).getText().trim();
-
       if (removePrefix != null && !removePrefix.isEmpty()) {
         text = text.replace(removePrefix, "").trim();
       }
-
       return text.isEmpty() ? null : text;
     } catch (NoSuchElementException e) {
       return null;
@@ -280,10 +265,8 @@ public class MercadoLibreScraper {
     By selector = Selectors.filtroPorTexto(texto);
     try {
       WebElement enlace = wait.until(ExpectedConditions.presenceOfElementLocated(selector));
-
       ((JavascriptExecutor) driver)
           .executeScript("arguments[0].scrollIntoView({block:'center'});", enlace);
-
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", enlace);
       esperarResultados(driver, wait, producto);
     } catch (Exception e) {
@@ -295,14 +278,10 @@ public class MercadoLibreScraper {
     try {
       WebElement boton =
           wait.until(ExpectedConditions.elementToBeClickable(Selectors.DROPDOWN_ORDEN));
-
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", boton);
-
       wait.until(ExpectedConditions.visibilityOfElementLocated(Selectors.LISTBOX_ORDEN));
-
       WebElement opcion =
           wait.until(ExpectedConditions.presenceOfElementLocated(Selectors.opcionOrden(texto)));
-
       ((JavascriptExecutor) driver).executeScript("arguments[0].click();", opcion);
       esperarResultados(driver, wait, producto);
     } catch (Exception e) {
@@ -324,26 +303,19 @@ public class MercadoLibreScraper {
   public static void guardarJson(String producto, List<ProductResult> resultados)
       throws IOException {
     Path dir = Paths.get("output");
-
     Files.createDirectories(dir);
-
     Path destino = dir.resolve(sanitizar(producto) + ".json");
-
     new ObjectMapper()
         .enable(SerializationFeature.INDENT_OUTPUT)
         .writeValue(destino.toFile(), resultados);
-
     LOG.info("JSON guardado", kv("path", destino.toAbsolutePath().toString()));
   }
 
   static void tomarScreenshot(WebDriver driver, String producto, String browser)
       throws IOException {
     Path dir = Paths.get("screenshots");
-
     Files.createDirectories(dir);
-
     File tmp = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
-
     Files.copy(
         tmp.toPath(),
         dir.resolve(sanitizar(producto) + "_" + browser + ".png"),

@@ -1,0 +1,1 @@
+{"query":{"bool":{"must":[{"exists":{"field":"level"}}],"filter":{"range":{"@timestamp":{"gte":"now-5m"}}}}}}

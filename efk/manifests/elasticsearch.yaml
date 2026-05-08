@@ -10,14 +10,16 @@ spec:
       count: 1
       config:
         node.roles: ["master", "data", "ingest"]
+        # Sin esta línea ES espera al menos 2 masters y queda en "yellow" para siempre.
         node.store.allow_mmap: false
-        index.number_of_shards: 1
-        index.number_of_replicas: 0
+        # Shards y réplicas se fijan en el index template (install.sh) — no aquí.
+        # ES 8.x rechaza index-level settings en el config de nodo con IllegalArgumentException.
       podTemplate:
         spec:
           containers:
             - name: elasticsearch
               env:
+                # Heap fijo: 1 GB (50% del limit de 2 GiB — regla de Elastic para JVM).
                 - name: ES_JAVA_OPTS
                   value: "-Xms1g -Xmx1g"
               resources:

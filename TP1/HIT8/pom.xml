@@ -25,6 +25,10 @@
         <logback.version>1.5.6</logback.version>
         <logstash.encoder.version>7.4</logstash.encoder.version>
 
+        <!-- OpenTelemetry — TP 2 - PARTE 3 - HIT 5 / HIT 6 -->
+        <otel.version>1.38.0</otel.version>
+        <otel.instrumentation.version>2.27.0-alpha</otel.instrumentation.version>
+
         <junit.jupiter.version>5.10.2</junit.jupiter.version>
         <mockito.version>5.11.0</mockito.version>
 
@@ -40,6 +44,14 @@
                 <groupId>com.google.collections</groupId>
                 <artifactId>google-collections</artifactId>
                 <version>9999.0-empty-to-avoid-conflict-with-guava</version>
+            </dependency>
+            <!-- BOM de OTel: fija versiones de todas las sub-dependencias -->
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-bom</artifactId>
+                <version>${otel.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -81,11 +93,33 @@
             <artifactId>logback-classic</artifactId>
             <version>${logback.version}</version>
         </dependency>
-        <!-- ── JSON structured logging (Hit #3) ──────────────────────────── -->
+        <!-- JSON structured logging ( TP 2 - PARTE 1 - Hit #3) --> 
         <dependency>
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
             <version>${logstash.encoder.version}</version>
+        </dependency>
+
+        <!-- ── OpenTelemetry — HIT 5: logs via OTLP ─────────────────────── -->
+        <!-- API + SDK base -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk</artifactId>
+        </dependency>
+        <!-- Exporter OTLP/gRPC (logs + spans) -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
+        <!-- Bridge Logback → OTel: captura los LOG.info() existentes sin cambiar nada -->
+        <dependency>
+            <groupId>io.opentelemetry.instrumentation</groupId>
+            <artifactId>opentelemetry-logback-appender-1.0</artifactId>
+            <version>${otel.instrumentation.version}</version>
         </dependency>
 
         <!-- ── Test ──────────────────────────────────────────────────────── -->
@@ -159,6 +193,8 @@
                             <excludes>
                                 <exclude>ar/edu/sip/Selectors.class</exclude>
                                 <exclude>ar/edu/sip/PostgresWriter.class</exclude>
+                                <!-- Excluir clases de OTel setup del coverage -->
+                                <exclude>ar/edu/sip/OtelSetup.class</exclude>
                             </excludes>
                         </configuration>
                     </execution>

@@ -1,7 +1,7 @@
 # 0009 — Evaluación de EFK como segundo stack de logging
 
 - Date: 2026-05-05
-- Status: Proposed
+- Status: Accepted
 - Deciders: Equipo SIP 2026
 
 ## Contexto

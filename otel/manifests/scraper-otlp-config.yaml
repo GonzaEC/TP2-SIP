@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scraper-otlp-config
+  namespace: ml-scraper
+data:
+  # El scraper exporta OTLP/gRPC al collector del mismo nodo (DaemonSet).
+  # El collector escucha en el puerto 4317 del nodo host, accesible
+  # via el IP del nodo. En k3d/k3s single-node, el pod puede usar
+  # el nombre de servicio del collector (si se expone como Service),
+  # o directamente la IP del nodo vía la env var OTEL_EXPORTER_OTLP_ENDPOINT.
+  #
+  # Para el Hit #5, el Deployment/Job del scraper debe montar este ConfigMap
+  # e inyectar las variables de entorno:
+  #
+  #   envFrom:
+  #     - configMapRef:
+  #         name: scraper-otlp-config
+  #
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://agent-collector.otel.svc.cluster.local:4317"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+  OTEL_SERVICE_NAME: "scraper"
+  OTEL_LOGS_EXPORTER: "otlp"
+  OTEL_TRACES_EXPORTER: "otlp"
