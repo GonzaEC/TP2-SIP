@@ -1,0 +1,165 @@
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"opentelemetry.io/v1beta1","kind":"OpenTelemetryCollector","metadata":{"annotations":{},"name":"agent","namespace":"otel"},"spec":{"config":{"exporters":{"debug":{"verbosity":"basic"},"elasticsearch":{"endpoints":["https://scraper-es-http.elastic.svc.cluster.local:9200"],"logs_index":"scraper-logs","mapping":{"mode":"ecs"},"password":"${env:ELASTIC_PASSWORD}","tls":{"insecure_skip_verify":true},"user":"elastic"},"otlphttp/loki":{"endpoint":"http://loki.observability.svc.cluster.local:3100/otlp"}},"processors":{"attributes":{"actions":[{"action":"insert","from_attribute":"app","key":"service"}]},"batch":{"send_batch_size":1024,"timeout":"10s"},"k8sattributes":{"auth_type":"serviceAccount","extract":{"labels":[{"from":"pod","key":"app","tag_name":"app"},{"from":"pod","key":"app.kubernetes.io/component","tag_name":"component"}],"metadata":["k8s.namespace.name","k8s.pod.name","k8s.pod.uid","k8s.deployment.name","k8s.statefulset.name","k8s.daemonset.name","k8s.cronjob.name","k8s.job.name","k8s.node.name"]},"passthrough":false,"pod_association":[{"sources":[{"from":"resource_attribute","name":"k8s.pod.uid"}]},{"sources":[{"from":"connection"}]}]},"transform":{"log_statements":[{"context":"log","statements":["set(attributes[\"log_id\"], UUID()) where attributes[\"log_id\"] == nil"]}]}},"receivers":{"filelog":{"include":["/var/log/pods/ml-scraper_*/*/*.log"],"include_file_name":false,"include_file_path":true,"operators":[{"id":"container-parser","type":"container"}],"start_at":"end"},"otlp":{"protocols":{"grpc":{"endpoint":"0.0.0.0:4317"},"http":{"endpoint":"0.0.0.0:4318"}}}},"service":{"pipelines":{"logs":{"exporters":["otlphttp/loki","elasticsearch"],"processors":["k8sattributes","attributes","transform","batch"],"receivers":["filelog","otlp"]}},"telemetry":{"logs":{"level":"info"}}}},"env":[{"name":"ELASTIC_PASSWORD","valueFrom":{"secretKeyRef":{"key":"password","name":"elastic-credentials"}}}],"image":"otel/opentelemetry-collector-contrib:0.110.0","mode":"daemonset","resources":{"limits":{"cpu":"300m","memory":"256Mi"},"requests":{"cpu":"100m","memory":"128Mi"}},"serviceAccount":"otel-collector","tolerations":[{"effect":"NoSchedule","operator":"Exists"}],"volumeMounts":[{"mountPath":"/var/log","name":"varlog","readOnly":true},{"mountPath":"/var/lib/docker/containers","name":"varlibdockercontainers","readOnly":true}],"volumes":[{"hostPath":{"path":"/var/log"},"name":"varlog"},{"hostPath":{"path":"/var/lib/docker/containers"},"name":"varlibdockercontainers"}]}}
+  creationTimestamp: "2026-05-08T20:55:24Z"
+  finalizers:
+  - opentelemetrycollector.opentelemetry.io/finalizer
+  generation: 1
+  name: agent
+  namespace: otel
+  resourceVersion: "19131"
+  uid: 9c245664-9fe5-4c0e-a799-62c6e949372c
+spec:
+  config:
+    exporters:
+      debug:
+        verbosity: basic
+      elasticsearch:
+        endpoints:
+        - https://scraper-es-http.elastic.svc.cluster.local:9200
+        logs_index: scraper-logs
+        mapping:
+          mode: ecs
+        password: ${env:ELASTIC_PASSWORD}
+        tls:
+          insecure_skip_verify: true
+        user: elastic
+      otlphttp/loki:
+        endpoint: http://loki.observability.svc.cluster.local:3100/otlp
+    processors:
+      attributes:
+        actions:
+        - action: insert
+          from_attribute: app
+          key: service
+      batch:
+        send_batch_size: 1024
+        timeout: 10s
+      k8sattributes:
+        auth_type: serviceAccount
+        extract:
+          labels:
+          - from: pod
+            key: app
+            tag_name: app
+          - from: pod
+            key: app.kubernetes.io/component
+            tag_name: component
+          metadata:
+          - k8s.namespace.name
+          - k8s.pod.name
+          - k8s.pod.uid
+          - k8s.deployment.name
+          - k8s.statefulset.name
+          - k8s.daemonset.name
+          - k8s.cronjob.name
+          - k8s.job.name
+          - k8s.node.name
+        passthrough: false
+        pod_association:
+        - sources:
+          - from: resource_attribute
+            name: k8s.pod.uid
+        - sources:
+          - from: connection
+      transform:
+        log_statements:
+        - context: log
+          statements:
+          - set(attributes["log_id"], UUID()) where attributes["log_id"] == nil
+    receivers:
+      filelog:
+        include:
+        - /var/log/pods/ml-scraper_*/*/*.log
+        include_file_name: false
+        include_file_path: true
+        operators:
+        - id: container-parser
+          type: container
+        start_at: end
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    service:
+      pipelines:
+        logs:
+          exporters:
+          - otlphttp/loki
+          - elasticsearch
+          processors:
+          - k8sattributes
+          - attributes
+          - transform
+          - batch
+          receivers:
+          - filelog
+          - otlp
+      telemetry:
+        logs:
+          level: info
+        metrics:
+          address: 0.0.0.0:8888
+  configVersions: 3
+  daemonSetUpdateStrategy: {}
+  deploymentUpdateStrategy: {}
+  env:
+  - name: ELASTIC_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        key: password
+        name: elastic-credentials
+  image: otel/opentelemetry-collector-contrib:0.110.0
+  ingress:
+    route: {}
+  ipFamilyPolicy: SingleStack
+  managementState: managed
+  mode: daemonset
+  observability:
+    metrics: {}
+  podDnsConfig: {}
+  replicas: 1
+  resources:
+    limits:
+      cpu: 300m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  serviceAccount: otel-collector
+  targetAllocator:
+    allocationStrategy: consistent-hashing
+    filterStrategy: relabel-config
+    observability:
+      metrics: {}
+    prometheusCR:
+      scrapeInterval: 30s
+    resources: {}
+  tolerations:
+  - effect: NoSchedule
+    operator: Exists
+  upgradeStrategy: automatic
+  volumeMounts:
+  - mountPath: /var/log
+    name: varlog
+    readOnly: true
+  - mountPath: /var/lib/docker/containers
+    name: varlibdockercontainers
+    readOnly: true
+  volumes:
+  - hostPath:
+      path: /var/log
+    name: varlog
+  - hostPath:
+      path: /var/lib/docker/containers
+    name: varlibdockercontainers
+status:
+  image: otel/opentelemetry-collector-contrib:0.110.0
+  scale:
+    selector: app.kubernetes.io/component=opentelemetry-collector,app.kubernetes.io/instance=otel.agent,app.kubernetes.io/managed-by=opentelemetry-operator,app.kubernetes.io/name=agent-collector,app.kubernetes.io/part-of=opentelemetry,app.kubernetes.io/version=0.110.0
+  version: 0.113.0

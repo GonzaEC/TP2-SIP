@@ -5,7 +5,7 @@ singleBinary:
   replicas: 1
   resources:
     requests: { cpu: 100m, memory: 256Mi }
-    limits:   { cpu: 500m, memory: 512Mi }
+    limits: { cpu: 200m, memory: 256Mi } # reducir los recursos de loki para que k3 no ahogue el sistema.
   persistence:
     enabled: true
     size: 5Gi
@@ -27,9 +27,9 @@ loki:
           prefix: loki_index_
           period: 24h
   limits_config:
-    retention_period: 168h          # 7 días — alcanza para el TP
+    retention_period: 24h          # 1 días — para correrlo localmente en mi pc
     reject_old_samples: true
-    reject_old_samples_max_age: 168h
+    reject_old_samples_max_age: 24h
     max_query_length: 721h          # 30 días
   compactor:
     retention_enabled: true

@@ -31,7 +31,7 @@ extraVolumeMounts:
     mountPath: /etc/fluent-bit/certs
     readOnly: true
   - name: lua-scripts
-    mountPath: /fluent-bit/etc/conf
+    mountPath: /fluent-bit/etc/lua
     readOnly: true
 
 env:
@@ -106,14 +106,14 @@ config:
     [FILTER]
         Name    lua
         Match   kube.*
-        script  /fluent-bit/etc/conf/product_extractor.lua
+        script  /fluent-bit/etc/lua/product_extractor.lua
         call    extract_product
 
     # Detecta eventos especiales y agrega campo event
     [FILTER]
         Name    lua
         Match   kube.*
-        script  /fluent-bit/etc/conf/product_extractor.lua
+        script  /fluent-bit/etc/lua/product_extractor.lua
         call    extract_event
 
   outputs: |

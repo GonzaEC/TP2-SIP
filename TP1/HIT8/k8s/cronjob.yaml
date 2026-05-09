@@ -57,15 +57,21 @@ spec:
                     name: scraper-config
                 # Variables OTel (OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_SERVICE_NAME, etc.)
                 - configMapRef:
-                    name: otel-collector-endpoint
+                    name: scraper-otlp-config 
               volumeMounts:
                 - name: output
                   mountPath: /app/output
                 - name: screenshots
                   mountPath: /app/screenshots
+                - name: dshm
+                  mountPath: /dev/shm
           volumes:
             - name: output
               persistentVolumeClaim:
                 claimName: scraper-output
             - name: screenshots
               emptyDir: {}
+            - name: dshm
+              emptyDir:
+                medium: Memory
+                sizeLimit: 512Mi

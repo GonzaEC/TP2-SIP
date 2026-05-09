@@ -1,0 +1,24 @@
+$ fastfetch -l none
+fede@stardragon
+---------------
+OS: Arch Linux x86_64
+Host: MS-7C88 (1.0)
+Kernel: Linux 7.0.3-arch1-2
+Uptime: 4 hours, 52 mins
+Packages: 1196 (pacman)
+Shell: bash 5.3.9
+Display (PHILIPS FTV): 1360x768 in 29", 60 Hz [External]
+WM: Hyprland 0.54.3 (Wayland)
+Theme: Raleigh [GTK2/3]
+Icons: Adwaita [GTK2/3]
+Font: System-ui (14pt) [GTK2/3]
+Cursor: Adwaita (24px)
+Terminal: kitty 0.46.2
+Terminal Font: monospace (14pt)
+CPU: Intel(R) Core(TM) i5-10400 (12) @ 4.30 GHz
+GPU: Intel UHD Graphics 630 @ 1.10 GHz [Integrated]
+Memory: 6.00 GiB / 7.61 GiB (79%)
+Swap: 2.11 GiB / 3.81 GiB (55%)
+Disk (/): 752.80 GiB / 931.01 GiB (81%) - btrfs
+Local IP (wlp0s20f0u3): 192.168.1.41/24
+Locale: en_US.UTF-8

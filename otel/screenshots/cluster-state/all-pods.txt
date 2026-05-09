@@ -1,0 +1,27 @@
+NAMESPACE              NAME                                                    READY   STATUS             RESTARTS         AGE
+cert-manager           cert-manager-797c9cdb86-864wr                           1/1     Running            11 (7m12s ago)   82m
+cert-manager           cert-manager-cainjector-558fd876c9-kncv9                0/1     CrashLoopBackOff   10 (4m32s ago)   82m
+cert-manager           cert-manager-webhook-56d7979558-hpj8l                   1/1     Running            0                82m
+elastic-system         elastic-operator-0                                      0/1     CrashLoopBackOff   24 (2m26s ago)   154m
+elastic                fluent-bit-p8hld                                        1/1     Running            0                117m
+elastic                scraper-es-default-0                                    1/1     Running            0                131m
+elastic                scraper-kb-8cf89d6f6-lvk6r                              1/1     Running            0                152m
+kube-system            coredns-c4dbffb5f-vz6dk                                 1/1     Running            4 (4h36m ago)    4d3h
+kube-system            helm-install-traefik-b6gjd                              0/1     Completed          1                4d3h
+kube-system            helm-install-traefik-crd-vhx96                          0/1     Completed          0                4d3h
+kube-system            local-path-provisioner-5c4dc5d66d-pmc9f                 1/1     Running            4 (4h36m ago)    4d3h
+kube-system            metrics-server-786d997795-zfw46                         1/1     Running            5 (51m ago)      4d3h
+kube-system            svclb-traefik-3d87b53a-nzbzd                            2/2     Running            8 (4h36m ago)    4d3h
+kube-system            traefik-9bcdbbd9-zbf5z                                  1/1     Running            4 (4h36m ago)    4d3h
+ml-scraper             postgres-0                                              1/1     Running            0                3h52m
+ml-scraper             scraper-hourly-29637780-tw8gm                           0/1     Completed          0                3h1m
+ml-scraper             scraper-hourly-29637840-q2ts7                           0/1     Completed          0                121m
+ml-scraper             scraper-hourly-29637900-q6bm2                           0/1     Completed          0                61m
+ml-scraper             scraper-hourly-29637960-wfr4w                           0/1     Init:0/1           0                91s
+ml-scraper             scraper-sdk-test-1-zlrz6                                0/1     Completed          0                174m
+observability          grafana-d7748b84f-6pztq                                 1/1     Running            0                3h26m
+observability          loki-0                                                  2/2     Running            0                3h27m
+observability          loki-canary-ccltl                                       1/1     Running            4 (4h36m ago)    4d1h
+observability          promtail-qd9fb                                          1/1     Running            0                3h17m
+otel-operator-system   otel-operator-opentelemetry-operator-576c8f789b-k6965   2/2     Running            4 (13m ago)      75m
+otel                   agent-collector-kdxg8                                   1/1     Running            0                66m
