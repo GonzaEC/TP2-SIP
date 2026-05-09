@@ -40,88 +40,69 @@ docs/
 
 ### Entorno
 
-- **Cluster local:** k3d sobre una VM de desarrollo.
-- **Carga sintética:** log generator que emite ~300 MB/día distribuidos en 4 servicios ficticios (`scraper`, `normalizer`, `api-gateway`, `scheduler`), equivalente al volumen de producción actual
-- **Duración de cada experimento:** 24 horas de ingesta continua antes de tomar mediciones de disco.
+- **Cluster local:** k3d (`scraper`) — 1 server, 0 agents, corriendo sobre Docker Desktop en Windows
+- **Carga real:** CronJob `scraper-hourly` del proyecto `ml-scraper`, emitiendo logs reales cada hora durante 24 hs
+- **Duración:** 24 horas de ingesta continua antes de tomar mediciones de disco; RAM/CPU medidos en 3 muestras espaciadas 1 hora en steady state
 
 ### RAM y CPU — `kubectl top`
 
-Cada stack fue desplegado en un namespace aislado. Las mediciones se tomaron con:
+Los 3 stacks corrieron simultáneamente en namespaces aislados (`observability`, `elastic`, `otel`). Se tomaron 3 muestras espaciadas 1 hora y se reporta media ± desviación estándar.
 
 ```bash
-# Esperar steady state
-kubectl top pods -n <namespace> --sort-by=memory
+kubectl top pods -n observability --no-headers | awk '{cpu+=$2; mem+=$3} END {print "Loki stack:", cpu"m CPU,", mem"Mi RAM"}'
+kubectl top pods -n elastic --no-headers | awk '{cpu+=$2; mem+=$3} END {print "EFK stack:", cpu"m CPU,", mem"Mi RAM"}'
+kubectl top pods -n otel --no-headers | awk '{cpu+=$2; mem+=$3} END {print "OTel stack:", cpu"m CPU,", mem"Mi RAM"}'
 ```
 
-Las capturas correspondientes están en `screenshots/kubectl-top-*.png`.
-
-Para reproducir desde cero:
-
-```bash
-# Loki stack
-kubectl apply -f deploy/loki-stack.yaml
-kubectl wait --for=condition=ready pod -l app=loki -n loki --timeout=300s
-
-kubectl top pods -n loki
-
-# EFK stack
-kubectl apply -f deploy/efk-stack.yaml
-kubectl wait --for=condition=ready pod -l app=elasticsearch -n efk --timeout=600s
-
-kubectl top pods -n efk
-
-# OTel Collector
-kubectl apply -f deploy/otel-collector.yaml
-kubectl wait --for=condition=ready pod -l app=otel-collector -n otel --timeout=120s
-
-kubectl top pods -n otel
-```
+Las capturas del output crudo están en `screenshots/kubectl-top-*.png`.
 
 ### Tiempo de deploy clean → first log
 
-Medido con `time` desde `kubectl apply` hasta que el primer log aparece en la UI (Grafana/Kibana) o en el backend:
+Medido con cronómetro en mano desde `k3d cluster create` hasta que el primer log del scraper apareció en Grafana (Loki) o Kibana (EFK). Una sola corrida por stack en cluster limpio (`k3d-test-deploy`).
 
-```bash
-time kubectl apply -f deploy/<stack>.yaml && \
-  kubectl wait --for=condition=ready pod -l app=<app> -n <ns> --timeout=600s
-```
+- **Loki:** cluster limpio → `bash install.sh` → port-forward → scraper job → primer log en Grafana
+- **EFK:** cluster limpio → `bash install.sh` → port-forward → scraper job → primer log en Kibana  
+- **OTel:** requiere Loki + EFK activos como backends → `bash install.sh` → scraper job → primer log en Grafana
 
-El "first log" se verificó visualmente en cada UI y se registró manualmente. Ver valores en `measurements.md`.
+Ver valores exactos en `measurements.md`.
 
 ### Disco PVC tras 24 h
 
+Medido con `du -sh` dentro de cada pod backend. En Windows/Git Bash se requiere `MSYS_NO_PATHCONV=1` para evitar conversión de paths:
+
 ```bash
-# Dentro del pod de cada backend
-kubectl exec -n <namespace> <pod-name> -- df -h /data
+MSYS_NO_PATHCONV=1 kubectl -n observability exec loki-0 -c loki -- du -sh /var/loki
+MSYS_NO_PATHCONV=1 kubectl -n elastic exec scraper-es-default-0 -c elasticsearch -- du -sh /usr/share/elasticsearch/data
 ```
 
-Captura en `screenshots/pvc-disk-usage.png`.
-
-> **Nota:** Los valores de disco PVC para Loki y EFK están pendientes de medición (marcados como N/M en `measurements.md`).
+OTel Collector no tiene PVC propio — opera como pipeline y hace fan-out a Loki y Elasticsearch sin retención local. Captura en `screenshots/pvc-disk-usage.png`.
 
 ### Query latency p50 / p95
 
-Para Loki, latencia medida con LogQL desde Grafana Explore:
+Pregunta canónica: *"errores del scraper en la última hora, agrupados por producto"*. Se corrió 10 veces cada query con `time curl` y se reporta p50 (mediana) y p95 (valor 10 ordenado).
 
-```logql
-{service="api-gateway"} |= "error"
+```bash
+# Loki — requiere port-forward svc/loki 3100:3100
+# Elasticsearch — requiere port-forward svc/scraper-es-http 9200:9200
 ```
 
-Se registró el tiempo de respuesta reportado por Grafana para un rango de 1 hora de logs. Ver procedimiento detallado en `measurements.md`.
+Ver comandos completos y tiempos raw en `measurements.md`. Captura en `screenshots/query-latency-comparison.png`.
 
-> **Nota:** Los valores de query latency están pendientes de medición (marcados como N/M en `measurements.md`).
+### Tamaño de imagen del agente
 
-Capturas en `screenshots/query-latency-comparison.png`.
+Las imágenes fueron inspeccionadas directamente dentro del nodo k3d, ya que no están disponibles en el Docker local del host:
+
+```bash
+docker exec k3d-scraper-server-0 crictl images | grep -E "promtail|fluent-bit|opentelemetry-collector"
+```
 
 ---
 
 ## Cambios al scraper (Partes 1–3)
 
-No se realizaron cambios al código del scraper en esta entrega. Todos los archivos modificados en `Parte 4` son exclusivamente documentación bajo `docs/`.
+No se realizaron cambios al código del scraper en esta entrega. Todos los archivos modificados en Parte 4 son exclusivamente documentación bajo `docs/`.
 
-> Si durante la preparación de esta entrega se detectara un bug heredado de Partes 1–3 que requiriera corrección, se documentaría aquí con el commit SHA correspondiente y la justificación. Al momento de esta entrega, no aplica.
-
-
+---
 
 ## Referencias cruzadas
 

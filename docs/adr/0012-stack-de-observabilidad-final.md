@@ -31,7 +31,7 @@ Este escenario es representativo del primer trabajo de un desarrollador backend 
 
 Stack de logging nativo de Grafana Labs, diseñado bajo el principio "index labels, not text". Loki almacena logs comprimidos en object storage y solo indexa las etiquetas (labels) definidas explícitamente; las queries se hacen en LogQL.
 
-**Mediciones empíricas (Hit #1):** RAM total del stack = 324 MiB; tiempo de deploy clean-to-first-log = 3:58 min; tamaño de imagen del agente (Promtail) = 76.4 MiB.
+**Mediciones empíricas (Hit #1):** RAM total del stack = 369 ± 22 MiB (media de 3 muestras en steady state); query latency p50 = 139 ms, p95 = 349 ms; disco PVC tras 24 h = 13.1 MiB; tiempo de deploy clean-to-first-log = 3:58 min (238 s); tamaño de imagen del agente (Promtail) = 76.4 MiB.
 
 **Pro principal en nuestro contexto:** Footprint de recursos muy bajo para un equipo sin SRE. Integración nativa con Grafana (que ya usaríamos para métricas de Prometheus).
 
@@ -43,11 +43,11 @@ Stack de logging nativo de Grafana Labs, diseñado bajo el principio "index labe
 
 Stack clásico de logging: Elasticsearch como motor de búsqueda e indexado, Fluent Bit como agente de recolección liviano, Kibana como interfaz de exploración y dashboards.
 
-**Mediciones empíricas (Hit #1):** RAM total del stack = 2142 MiB; tiempo de deploy clean-to-first-log = 9:09 min; tamaño de imagen del agente (Fluent Bit) = 39.4 MiB.
+**Mediciones empíricas (Hit #1):** RAM total del stack = 2171 ± 31 MiB (media de 3 muestras en steady state); query latency p50 = 72 ms, p95 = 397 ms; disco PVC tras 24 h = 8.4 MiB; tiempo de deploy clean-to-first-log = 9:09 min (549 s); tamaño de imagen del agente (Fluent Bit) = 39.4 MiB.
 
-**Pro principal:** Full-text search sobre cualquier campo del log sin configuración previa. Kibana es maduro y tiene capacidades avanzadas de visualización.
+**Pro principal:** Full-text search sobre cualquier campo del log sin configuración previa, con p50 de latencia (72 ms) mejor que Loki. Kibana es maduro y tiene capacidades avanzadas de visualización.
 
-**Contra principal en nuestro contexto:** El consumo de RAM (2142 MiB) es 6.6× el de Loki (324 MiB). Para nuestro presupuesto de USD 280/mes, eso representa una instancia EC2 adicional de ~USD 35-50/mes dedicada exclusivamente a observabilidad — un 12-18% del presupuesto total. Con un equipo sin SRE, el costo operativo de tuning de Elasticsearch (heap sizing, shard management, index lifecycle policies) es otro impuesto invisible.
+**Contra principal en nuestro contexto:** El consumo de RAM (2171 MiB) es 5.9× el de Loki (369 MiB). Para nuestro presupuesto de USD 280/mes, eso representa una instancia EC2 adicional de ~USD 35-50/mes dedicada exclusivamente a observabilidad — un 12-18% del presupuesto total. Con un equipo sin SRE, el costo operativo de tuning de Elasticsearch (heap sizing, shard management, index lifecycle policies) es otro impuesto invisible. Adicionalmente, el p95 de latency de ES (397 ms) es peor que el de Loki (349 ms) — el beneficio de full-text search no se traduce en mejor latencia en el percentil que importa para incidentes.
 
 ---
 
@@ -55,11 +55,11 @@ Stack clásico de logging: Elasticsearch como motor de búsqueda e indexado, Flu
 
 OpenTelemetry Collector es un componente CNCF vendor-neutral que actúa como capa de instrumentación universal: recibe señales (logs, métricas, traces) de múltiples fuentes y las reenvía a cualquier backend compatible (Loki, Elasticsearch, Jaeger, Prometheus, etc.).
 
-**Mediciones empíricas (Hit #1):** RAM del Collector aislado = 84 MiB; CPU = 7 mCPU; tiempo de deploy = 8:13 min. El Collector es passthrough: no almacena datos, por lo que el disco depende del backend elegido.
+**Mediciones empíricas (Hit #1):** RAM del Collector aislado = 90 ± 4 MiB; CPU = 9 ± 2 mCPU; tiempo de deploy = 8:13 min (493 s). El Collector es passthrough: no almacena datos ni tiene query engine propio, por lo que disco y latencia dependen del backend elegido.
 
 **Pro principal:** Desacopla la instrumentación del backend. Migrar de Loki a Elasticsearch en el futuro no requiere re-instrumentar los servicios; solo se cambia la configuración del exportador en el Collector.
 
-**Contra principal:** Solo como componente aislado no es una solución de observabilidad completa. Necesita un backend para ser útil, lo que lo convierte en una capa adicional. Sin embargo, su bajo footprint (84 MiB) permite combinarlo con Loki sin que el total supere los 408 MiB — cifra manejable.
+**Contra principal:** Solo como componente aislado no es una solución de observabilidad completa. Necesita un backend para ser útil, lo que lo convierte en una capa adicional. Sin embargo, su bajo footprint (90 MiB) permite combinarlo con Loki sin que el total supere los 459 MiB — cifra manejable y muy por debajo de EFK.
 
 ---
 
@@ -87,7 +87,7 @@ Plataforma de SIEM y observabilidad enterprise con capacidades de búsqueda avan
 
 **Adoptamos OpenTelemetry Collector como capa de instrumentación universal + Loki como backend de logs + Grafana como plataforma de visualización y alertas, con plan de evolución hacia Tempo (traces distribuidos) en los próximos 6 meses.**
 
-Esta combinación gana en nuestro contexto por tres razones convergentes. Primero, el footprint total del stack (OTel Collector + Loki + Grafana) se mantiene por debajo de los 500 MiB de RAM, lo que permite operar en los nodos existentes sin provisionar instancias adicionales. EFK requiere 2142 MiB solo para el stack de logging, lo que es incompatible con nuestro presupuesto. Segundo, el tiempo de deploy clean-to-first-log de Loki (3:58 min) es menos de la mitad que EFK (9:09 min), lo que reduce el MTTR en escenarios de "borrón y reinstalo" por un factor de 2.3×. Tercero, instrumentar con OTel desde el inicio nos protege contra el lock-in futuro: si en 12 meses el volumen de logs justifica migrar a un backend más potente (Elasticsearch, ClickHouse, o incluso Datadog), los servicios no necesitan ser re-instrumentados.
+Esta combinación gana en nuestro contexto por tres razones convergentes. Primero, el footprint total del stack (OTel Collector + Loki + Grafana) se mantiene por debajo de los 500 MiB de RAM (459 MiB medidos), lo que permite operar en los nodos existentes sin provisionar instancias adicionales. EFK requiere 2171 MiB solo para el stack de logging — 5.9× más — lo que es incompatible con nuestro presupuesto. Segundo, el tiempo de deploy clean-to-first-log de Loki (238 s) es 2.3× más rápido que EFK (549 s), lo que reduce el MTTR en escenarios de reinstalación de emergencia. Tercero, instrumentar con OTel desde el inicio nos protege contra el lock-in futuro: si en 12 meses el volumen de logs justifica migrar a un backend más potente, los servicios no necesitan ser re-instrumentados.
 
 EFK queda descartado por costo de recursos, no por calidad técnica. Datadog y Splunk quedan descartados por presupuesto. Loki standalone (sin OTel) queda descartado porque nos ata a Promtail como único agente posible.
 
@@ -97,7 +97,7 @@ Si el escenario del §1 cambia, esta decisión se revisita con los siguientes um
 
 ## 4. Trade-offs aceptados explícitos
 
-**Renunciamos a full-text search eficiente sobre contenido de logs.** Loki indexa labels, no texto libre. Buscar una subcadena arbitraria dentro del body de un log requiere filtros de línea (`|=`) que hacen un scan completo del período consultado. Para nuestro volumen actual (300 MB/día) esto es tolerable; si en 12 meses llegamos a 3 GB/día y necesitamos búsquedas ad-hoc frecuentes sobre payloads de error, el tiempo de query puede volverse inaceptable. Mitigación: definir desde el inicio un esquema de labels estructurado (`service`, `level`, `trace_id`) para minimizar la dependencia de full-text search. Si el problema se materializa, la capa OTel nos permite agregar un exportador a Elasticsearch en paralelo sin tocar los servicios.
+**Renunciamos a full-text search eficiente sobre contenido de logs, pero ganamos en p95.** Loki indexa labels, no texto libre. Buscar una subcadena arbitraria dentro del body de un log requiere filtros de línea (`|=`) que hacen un scan completo del período consultado; el p50 de Loki (139 ms) es casi el doble que el de EFK (72 ms). Sin embargo, el p95 de Loki (349 ms) es mejor que el de EFK (397 ms), lo que indica que EFK tiene colas más pesadas bajo carga. Para dashboards de incidentes, el p95 es el número que importa. Mitigación: definir desde el inicio un esquema de labels estructurado (`service`, `level`, `trace_id`) para minimizar la dependencia de full-text search. Si el problema se materializa a mayor escala, la capa OTel nos permite agregar un exportador a Elasticsearch en paralelo sin tocar los servicios.
 
 **Aceptamos operar Loki en modo single-binary sin alta disponibilidad.** No tenemos HA. Si el pod de Loki muere y el PVC se corrompe, perdemos el historial de logs almacenado. Mitigación: snapshots semanales automatizados del PVC vía AWS EBS Snapshots (costo: ~USD 0.05/GB/mes), y los servicios siguen emitiendo a stdout, por lo que `kubectl logs` sigue siendo un fallback válido para los últimos minutos.
 
@@ -111,25 +111,25 @@ Si el escenario del §1 cambia, esta decisión se revisita con los siguientes um
 
 ## 5. Evidencia empírica (Hit #1)
 
-Las siguientes mediciones fueron tomadas en un cluster de desarrollo local (k3s) con carga sintética equivalente a nuestro volumen de producción actual (~300 MB/día de logs). Los números de query latency y disco PVC no fueron medidos en este ciclo (marcado como N/M) y se documentan como deuda de medición para el siguiente sprint.
+Las siguientes mediciones fueron tomadas en un cluster k3d (`scraper`, 1 server, 0 agents) con el workload real `ml-scraper` (CronJob `scraper-hourly`). Ventana de medición: 2026-05-08 — 2026-05-09 (24 h). RAM y CPU son media ± desviación estándar de 3 muestras en steady state (t=0, t+1h, t+2h). Deploy medido con cronómetro desde `k3d cluster create` hasta primer log visible en el visualizador.
 
 | Métrica | Loki + Promtail + Grafana | EFK (ES + Fluent Bit + Kibana) | OTel Collector |
 |---|---|---|---|
-| RAM total (MiB) | 324 | 2142 | 84 |
-| CPU total (mCPU) | 30 | 81 | 7 |
-| Disco PVC tras 24 h (MiB) | N/M | N/M | passthrough (0) |
-| Query latency p50 (ms) | N/M | N/M | N/M |
-| Query latency p95 (ms) | N/M | N/M | N/M |
-| Deploy clean → first log | 3:58 min | 9:09 min | 8:13 min |
+| RAM total (MiB) | 369 ± 22 | 2171 ± 31 | 90 ± 4 |
+| CPU total (mCPU) | 35 ± 10 | 84 ± 27 | 9 ± 2 |
+| Disco PVC tras 24 h (MiB) | 13.1 | 8.4 | passthrough (0) |
+| Query latency p50 (ms) | 139 | 72 | passthrough |
+| Query latency p95 (ms) | 349 | 397 | passthrough |
+| Deploy clean → first log | 3:58 min (238 s) | 9:09 min (549 s) | 8:13 min (493 s) |
 | Tamaño imagen agente (MiB) | 76.4 | 39.4 | 73.3 |
 
 **Tres referencias clave al cuerpo de esta decisión:**
 
-- El footprint de RAM de EFK (2142 MiB medido) es 6.6× el de Loki (324 MiB). Para nuestro cluster en AWS, eso representa una instancia `t3.medium` adicional (~USD 30/mes) dedicada exclusivamente a observabilidad — un 10.7% de nuestro presupuesto cloud total, que consideramos inaceptable sin un SRE que lo justifique operativamente.
+- El footprint de RAM de EFK (2171 MiB medido) es 5.9× el de Loki (369 MiB). Para nuestro cluster en AWS, eso representa una instancia `t3.medium` adicional (~USD 30/mes) dedicada exclusivamente a observabilidad — un 10.7% de nuestro presupuesto cloud total, que consideramos inaceptable sin un SRE que lo justifique operativamente.
 
-- El tiempo de deploy clean-to-first-log de Loki (3:58 min) es 2.3× más rápido que EFK (9:09 min). En un escenario de "borrón total y reinstalo" durante un incidente a las 3 AM — que en un equipo sin oncall formal ocurre eventualmente — esa diferencia puede ser la diferencia entre 10 minutos y 25 minutos a ciegas.
+- El tiempo de deploy clean-to-first-log de Loki (238 s) es 2.3× más rápido que EFK (549 s). En un escenario de "borrón total y reinstalo" durante un incidente — que en un equipo sin oncall formal ocurre eventualmente — esa diferencia es la diferencia entre ~4 minutos y ~9 minutos a ciegas.
 
-- El OTel Collector con 84 MiB de RAM y 7 mCPU puede correr como sidecar o DaemonSet sin impacto medible en el presupuesto de recursos. Combinado con Loki (324 MiB), el stack total de observabilidad usa menos RAM que solo el stack de EFK.
+- La query latency p95 de Loki (349 ms) es mejor que la de EFK (397 ms), a pesar de que el p50 de EFK es más rápido (72 ms vs 139 ms). Para un dashboard de incidentes donde el peor caso importa más que el caso promedio, Loki es competitivo. Combinado con el OTel Collector (90 MiB), el stack total de observabilidad usa 459 MiB — menos de una cuarta parte del footprint de EFK solo.
 
 ---
 
